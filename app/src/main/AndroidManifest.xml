@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false"/> // for front facing only (aka Nexus 7)
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FLASHLIGHT"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+
+
+    <application>
+        android:icon="@drawable/icon"
+        android:label="@string/app_name"
+        android:largeHeap="true">
+        <!--  -->    	android:theme="@style/AppTheme"
+
+
+        <activity android:name=".MobileWebCam"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:screenOrientation="landscape"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".TakeHiddenPicture"
+            android:label="Taking Picture"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+        </activity>
+
+        <service android:name="de.baarflieger.mobilewebcam.PhotoService"/>
+        <service android:name="de.baarflieger.mobilewebcam.CustomReceiverService"/>
+
+        <activity
+            android:label="@string/webcam_settings"
+            android:name=".SettingsTabActivity">
+        </activity>
+
+        <activity
+            android:label="@string/webcam_settings"
+            android:name=".MobileWebCamSettings">
+        </activity>
+        <activity
+            android:label="@string/activity_settings"
+            android:name=".ActivitySettings">
+        </activity>
+
+        <activity
+            android:label="@string/upload_setup"
+            android:name=".UploadSetup">
+        </activity>
+        <activity
+            android:label="@string/webcam_settings"
+            android:name=".FTPSettings">
+        </activity>
+
+
+        <activity
+            android:label="@string/sdcard_settings"
+            android:name=".SDCardSettings">
+        </activity>
+        <activity
+            android:label="Remote Control"
+            android:name=".RemoteControlSettings">
+        </activity>
+        <activity
+            android:label="System Settings"
+            android:name=".SystemSettings">
+        </activity>
+
+        <activity
+            android:label="Bootup Start Mobilewebcam"
+            android:name=".StartMobileWebCamAction"
+            android:exported="true">
+        </activity>
+
+        <receiver android:enabled="true" android:exported="true" android:name=".BootUpReceiver"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".SMSReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".ControlReceiver" android:exported="true" tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="de.baarflieger.mobilewebcam.START" />
+                <action android:name="de.baarflieger.mobilewebcam.STOP" />
+                <action android:name="de.baarflieger.mobilewebcam.PHOTO" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".PhotoAlarmReceiver"/>
+
+        <service android:name=".MobileWebCamHttpService"/>
+
+    </application>
+
+</manifest>
