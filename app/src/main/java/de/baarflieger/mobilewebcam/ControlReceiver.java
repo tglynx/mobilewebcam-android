@@ -73,7 +73,7 @@ public class ControlReceiver extends BroadcastReceiver
 			AlarmManager alarmMgr = (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
 			Intent i = new Intent(context, PhotoAlarmReceiver.class);
 			i.putExtra("event", event);
-			PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, 0);
+			PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, PendingIntent.FLAG_IMMUTABLE);
 			alarmMgr.cancel(pendingIntent);
 			Calendar time = Calendar.getInstance();
 			time.setTimeInMillis(System.currentTimeMillis());
@@ -104,7 +104,7 @@ public class ControlReceiver extends BroadcastReceiver
 				AlarmManager alarmMgr = (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
 				Intent i = new Intent(context, PhotoAlarmReceiver.class);
 				i.putExtra("event", event);
-				PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, 0);
+				PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, PendingIntent.FLAG_IMMUTABLE);
 				alarmMgr.cancel(pendingIntent);
 				Calendar time = Calendar.getInstance();
 				time.setTimeInMillis(System.currentTimeMillis());
@@ -140,7 +140,7 @@ public class ControlReceiver extends BroadcastReceiver
 			{
 				AlarmManager alarmMgr = (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
 				Intent i = new Intent(context, PhotoAlarmReceiver.class);
-				PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, 0);
+				PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, PendingIntent.FLAG_IMMUTABLE);
 				alarmMgr.cancel(pendingIntent);
 				PhotoAlarmReceiver.StopNotification(context);
 			}

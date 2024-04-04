@@ -58,7 +58,7 @@ public class StartMobileWebCamAction extends Activity
 			{
 				AlarmManager alarmMgr = (AlarmManager)StartMobileWebCamAction.this.getSystemService(Context.ALARM_SERVICE);
 				Intent i = new Intent(StartMobileWebCamAction.this, PhotoAlarmReceiver.class);
-				PendingIntent pendingIntent = PendingIntent.getBroadcast(StartMobileWebCamAction.this, 0, i, 0);
+				PendingIntent pendingIntent = PendingIntent.getBroadcast(StartMobileWebCamAction.this, 0, i, PendingIntent.FLAG_IMMUTABLE);
 				alarmMgr.cancel(pendingIntent);
 				Calendar time = Calendar.getInstance();
 				time.setTimeInMillis(System.currentTimeMillis());

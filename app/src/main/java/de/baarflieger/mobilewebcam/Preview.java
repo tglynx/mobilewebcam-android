@@ -1154,7 +1154,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 		{
 			AlarmManager alarmMgr = (AlarmManager)mActivity.getSystemService(Context.ALARM_SERVICE);
 			Intent intent = new Intent(mActivity, PhotoAlarmReceiver.class);
-			PendingIntent pendingIntent = PendingIntent.getBroadcast(mActivity, 0, intent, 0);
+			PendingIntent pendingIntent = PendingIntent.getBroadcast(mActivity, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 			alarmMgr.cancel(pendingIntent);
 			Calendar time = Calendar.getInstance();
 			time.setTimeInMillis(System.currentTimeMillis());
@@ -1176,7 +1176,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 		{
 			AlarmManager alarmMgr = (AlarmManager)mActivity.getSystemService(Context.ALARM_SERVICE);
 			Intent intent = new Intent(mActivity, PhotoAlarmReceiver.class);
-			PendingIntent pendingIntent = PendingIntent.getBroadcast(mActivity, 0, intent, 0);
+			PendingIntent pendingIntent = PendingIntent.getBroadcast(mActivity, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 			alarmMgr.cancel(pendingIntent);
 		}
 

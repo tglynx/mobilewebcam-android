@@ -55,7 +55,7 @@ public class PhotoAlarmReceiver extends PhotoReceiver
 			AlarmManager alarmMgr = (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
 			Intent i = new Intent(context, PhotoAlarmReceiver.class);
 			i.putExtra("event", intent.getStringExtra("event"));
-			PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, 0);
+			PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, i, PendingIntent.FLAG_IMMUTABLE);
 			alarmMgr.cancel(pendingIntent);
 			time.add(Calendar.SECOND, refresh);
 			alarmMgr.set(AlarmManager.RTC_WAKEUP, time.getTimeInMillis(), pendingIntent);
