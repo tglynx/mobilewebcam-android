@@ -81,7 +81,7 @@ public class SystemSettings extends PreferenceActivity
 	         @Override
 	         public boolean onPreferenceClick(Preference preference)
 	         {
-		    	File path = new File(Environment.getExternalStorageDirectory() + "/MobileWebCam/");
+		    	File path = new File(SystemSettings.this.getExternalFilesDir(null)  + "/settings/");
     	    	boolean exists = path.exists();
     	    	if(!exists)
     	    	    exists = path.mkdirs();
@@ -98,7 +98,10 @@ public class SystemSettings extends PreferenceActivity
 						Toast.makeText(SystemSettings.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
 						e.printStackTrace();
 					}
-    	    	}
+
+    	    	} else {
+					Toast.makeText(SystemSettings.this, "Error: could not create directory", Toast.LENGTH_LONG).show();
+				}
 				return true;
 	         }
          });
@@ -108,7 +111,7 @@ public class SystemSettings extends PreferenceActivity
 	         @Override
 	         public boolean onPreferenceClick(Preference preference)
 	         {
-	        	File path = new File(Environment.getExternalStorageDirectory() + "/MobileWebCam/config.txt");
+	        	File path = new File(SystemSettings.this.getExternalFilesDir(null) + "/settings/config.txt");
     	    	if(path.exists())
     	    	{
 					StringBuilder cfg = new StringBuilder();
