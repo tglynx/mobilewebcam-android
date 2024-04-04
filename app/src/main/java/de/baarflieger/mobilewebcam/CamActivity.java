@@ -27,11 +27,18 @@ import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
 
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
 
 public class CamActivity extends Activity
 {
+	private static final int REQUEST_CAMERA_PERMISSION = 1;
     public PhotoSettings mSettings = null;
     
     protected Preview mPreview = null;
@@ -78,7 +85,18 @@ public class CamActivity extends Activity
     public void onResume()
     {
     	super.onResume();
-    	
+
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+				!= PackageManager.PERMISSION_GRANTED) {
+			// Camera permission has not been granted.
+			ActivityCompat.requestPermissions(this,
+					new String[]{Manifest.permission.CAMERA},
+					REQUEST_CAMERA_PERMISSION);
+		} else {
+			// Camera permission has been granted, continue with camera setup.
+			setupCamera();
+		}
+
         if(mWakeLock == null || !mWakeLock.isHeld())
         {
         	// get lock for preview
@@ -159,4 +177,24 @@ public class CamActivity extends Activity
 				tmpwifi.release();
 		}
     }
+	@Override
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if (requestCode == REQUEST_CAMERA_PERMISSION) {
+			if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				// Camera permission has been granted, preview can be displayed
+				Toast.makeText(this, "Camera permission was granted.", Toast.LENGTH_SHORT).show();
+				setupCamera();
+			} else {
+				// Camera permission was denied, disable camera functionality or inform the user.
+				Toast.makeText(this, "Camera permission request was denied.", Toast.LENGTH_SHORT).show();
+			}
+		}
+	}
+	private void setupCamera() {
+		if (mPreview != null) {
+			mPreview.onResume();
+		}
+		// Add any additional camera setup code here.
+	}
 }
