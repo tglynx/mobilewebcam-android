@@ -15,7 +15,6 @@
 
 package de.baarflieger.mobilewebcam;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
@@ -29,6 +28,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.Manifest;
 import android.content.pm.PackageManager;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.widget.Toast;
@@ -36,7 +36,7 @@ import androidx.annotation.NonNull;
 
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
 
-public class CamActivity extends Activity
+public class CamActivity extends AppCompatActivity
 {
 	private static final int REQUEST_CAMERA_PERMISSION = 1;
     public PhotoSettings mSettings = null;
