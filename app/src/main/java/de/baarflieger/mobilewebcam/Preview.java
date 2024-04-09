@@ -35,6 +35,7 @@ import android.view.OrientationEventListener;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Toast;
+import androidx.core.content.FileProvider;
 
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
 
@@ -1105,37 +1106,40 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 			mHandler.postDelayed(mPostPicture, 100);
 		}
 	}
-	
-	public static void sharePicture(Context c, PhotoSettings s, byte[] data)
-	{
-		if(c == null)
-		{
+
+	public static void sharePicture(Context c, PhotoSettings s, byte[] data) {
+		if (c == null) {
 			MobileWebCam.LogE("Unable to share picture: Context is null!");
 			return;
 		}
-		
+
 		sharePictureNow = false;
-		
-		FileOutputStream out = null;
+
 		try {
-			out = c.openFileOutput("current.jpg", Context.MODE_WORLD_READABLE);
+			// Save the file privately
+			File file = new File(c.getFilesDir(), "current.jpg");
+			FileOutputStream out = new FileOutputStream(file);
 			out.write(data);
 			out.flush();
-    		out.close();
-    		
-			if(s.mStoreGPS)
-				ExifWrapper.addCoordinates("file:///data/data/de.baarflieger.mobilewebcam/files/current.jpg", WorkImage.gLatitude, WorkImage.gLongitude, WorkImage.gAltitude);
-    		
+			out.close();
+
+			// Add GPS coordinates to the EXIF data if necessary
+			if (s.mStoreGPS) {
+				ExifWrapper.addCoordinates(file.toURI().toString(), WorkImage.gLatitude, WorkImage.gLongitude, WorkImage.gAltitude);
+			}
+
+			// Share the picture using FileProvider
+			Uri contentUri = FileProvider.getUriForFile(c, c.getApplicationContext().getPackageName() + ".provider", file);
 			final Intent shareIntent = new Intent(Intent.ACTION_SEND);
 			shareIntent.setType("image/jpeg");
-			shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file:///data/data/de.baarflieger.mobilewebcam/files/current.jpg"));
+			shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+			shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); // Grant temporary read permission to the recipient app
 			c.startActivity(Intent.createChooser(shareIntent, "Share picture ...").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
-		} catch(OutOfMemoryError e)
-		{
+		} catch (OutOfMemoryError e) {
 			e.printStackTrace();
 		}
 
