@@ -17,12 +17,15 @@ package de.baarflieger.mobilewebcam;
 
 import android.app.AlarmManager;
 import android.app.AlertDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.hardware.Camera;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
 import android.util.Log;
@@ -549,7 +552,25 @@ public class MobileWebCam extends CamActivity
 
         return false;
     }
-    
+
+	private void createNotificationChannels() {
+
+		// Create the NotificationChannel, but only on API 26+ because
+		// the NotificationChannel class is new and not in the support library
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+			NotificationManager notificationManager = getSystemService(NotificationManager.class);
+
+			NotificationChannel channel = new NotificationChannel(getString(R.string.notification_channel_id), getString(R.string.channel_name), NotificationManager.IMPORTANCE_DEFAULT);
+			channel.setDescription(getString(R.string.channel_description));
+			notificationManager.createNotificationChannel(channel);
+
+			NotificationChannel servicechannel = new NotificationChannel(getString(R.string.notification_servicechannel_id), getString(R.string.servicechannel_name), NotificationManager.IMPORTANCE_DEFAULT);
+			servicechannel.setDescription(getString(R.string.servicechannel_description));
+			notificationManager.createNotificationChannel(servicechannel);
+
+		}
+	}
     @Override
 	protected void onCreate(Bundle savedInstanceState)
     {
@@ -560,7 +581,9 @@ public class MobileWebCam extends CamActivity
 	        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 	        mLayout = R.layout.layout_fullscreen;
         }
-        
+
+		createNotificationChannels();
+
         super.onCreate(savedInstanceState);
         
 //***        if(DEBUG_MOTIONDETECT)

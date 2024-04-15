@@ -15,9 +15,7 @@
 
 package de.baarflieger.mobilewebcam;
 
-import android.app.Notification;
 import android.app.NotificationManager;
-import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -71,23 +69,9 @@ public class PhotoReceiver extends BroadcastReceiver
 		SharedPreferences prefs = c.getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0);
 		PhotoSettings.Mode mode = PhotoSettings.getCamMode(prefs);
 
-		String channelId = "your_channel_id"; // Unique ID for notification channel
-		CharSequence channelName = "MobileWebCam Notification Channel"; // User-visible name of the channel
-		String channelDescription = "Notifications for MobileWebCam app"; // User-visible description of the channel
-
 		NotificationManager mNotificationManager = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
 
-		// Create a NotificationChannel for API level 26 and higher
-		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-			int importance = NotificationManager.IMPORTANCE_DEFAULT;
-			NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
-			channel.setDescription(channelDescription);
-			if (mNotificationManager != null) {
-				mNotificationManager.createNotificationChannel(channel);
-			}
-		}
-
-		int icon = R.drawable.notification_icon; // make sure you have this icon in your drawable resources
+		int icon = R.drawable.notification_icon;
 		String broadcast_action = prefs.getString("cam_broadcast_activation", "");
 		CharSequence tickerText[] = {"MobileWebCam background mode active", "MobileWebCam semi background mode active", "MobileWebCam broadcastreceiver '" + broadcast_action + "' active"};
 		long when = System.currentTimeMillis();
@@ -113,7 +97,7 @@ public class PhotoReceiver extends BroadcastReceiver
 		PendingIntent contentIntent = PendingIntent.getActivity(c, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT); // For API level 31 and above, FLAG_IMMUTABLE or FLAG_MUTABLE should be used
 
 		// Building the notification
-		NotificationCompat.Builder builder = new NotificationCompat.Builder(c, channelId)
+		NotificationCompat.Builder builder = new NotificationCompat.Builder(c, c.getString(R.string.notification_channel_id))
 				.setSmallIcon(icon)
 				.setContentTitle(contentTitle)
 				.setContentText(txt)

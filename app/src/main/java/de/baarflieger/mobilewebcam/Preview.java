@@ -215,11 +215,13 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 											if(mSettings.mAutoFocus)
 											{
 												autofocusCallback.mPhotoEvent = "timer";
+												startPreview();
 												mCamera.autoFocus(autofocusCallback);
 											}
 											else
 											{
 												photoCallback.mPhotoEvent = "timer";
+												startPreview();
 												mCamera.takePicture(shutterCallback, null, photoCallback);
 											}
 										}
@@ -405,7 +407,31 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 		mHandler.removeCallbacks(mPostPicture);
 		mHandler.post(mPostPicture);
 	}
-	
+
+	// Method to stop the camera preview and release the camera
+	public synchronized void stopPreview() {
+		if (mCamera != null) {
+			try {
+				mCamera.stopPreview();
+				// You might also want to set a flag indicating that the preview is stopped.
+			} catch (Exception e) {
+				Log.e("MobileWebCam", "Failed to stop camera preview: " + e.getMessage());
+			}
+		}
+	}
+
+	// Method to start the camera preview
+	public synchronized void startPreview() {
+		if (mCamera != null) {
+			try {
+				mCamera.startPreview();
+				// Ensure to reset any flags you might have set when stopping the preview.
+			} catch (Exception e) {
+				Log.e("MobileWebCam", "Failed to start camera preview: " + e.getMessage());
+			}
+		}
+	}
+
     @Override
     public boolean onTouchEvent(MotionEvent event)
     {
@@ -645,7 +671,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 						// show preview window
 						try
 						{
-							mCamera.startPreview();
+							//mCamera.startPreview();
 						}
 						catch(RuntimeException e)
 						{
@@ -1021,7 +1047,8 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 				{
 					try
 					{
-						mCamera.startPreview();
+						// Commented to save battery power in normal mode
+						//mCamera.startPreview();
 					}
 					catch(RuntimeException e)
 					{

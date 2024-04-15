@@ -1,5 +1,92 @@
 <resources>
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
+
+    <style name="Theme.Mobilewebcam" parent="Theme.AppCompat.Light.DarkActionBar">
     </style>
+
+    <style name="Theme.MobilewebcamTest1" parent="Theme.AppCompat.DayNight.DarkActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorPrimaryVariant">@android:color/black</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/teal_200</item>
+        <item name="colorSecondaryVariant">@color/teal_700</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+
+        <!-- Window and text colors. -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textColorSecondary">@color/white</item>
+
+        <item name="android:itemBackground">@color/black</item>
+
+        <!-- Button styles for visibility -->
+        <item name="android:buttonStyle">@style/Theme.Mobilewebcam.Button</item>
+    </style>
+
+    <style name="Theme.Mobilewebcam.Button" parent="Widget.AppCompat.Button">
+        <item name="android:textColor">@color/teal_700</item>
+        <item name="android:background">@color/white</item>
+    </style>
+
+    <!-- Preferences Dialog Theme -->
+    <style name="PreferencesTheme.Dialog" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:background">@android:color/white</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textColorSecondary">@color/black</item>
+        <item name="colorAccent">@color/teal_200</item>
+        <item name="android:buttonStyle">@style/PreferencesTheme.Dialog.Button</item>
+    </style>
+
+    <!-- Button style for Preferences Dialog -->
+    <style name="PreferencesTheme.Dialog.Button" parent="Widget.AppCompat.Button">
+        <item name="android:textColor">@color/teal_700</item>
+
+    </style>
+
+
+    <style name="Theme.MobilewebcamTest2" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Main background color -->
+        <item name="android:background">@android:color/black</item>
+        <item name="android:textColor">@android:color/white</item>
+
+        <!-- For dialogs and other elements -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorPrimaryDark">@android:color/black</item>
+        <item name="colorAccent">@color/teal_200</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@android:color/white</item>
+        <item name="alertDialogTheme">@style/AlertDialogTheme</item>
+
+        <!-- Spinner (Dropdown) customization -->
+        <item name="android:spinnerStyle">@style/SpinnerStyle</item>
+
+        <!-- EditText customization -->
+        <item name="android:editTextStyle">@style/EditTextStyle</item>
+    </style>
+
+    <!-- AlertDialog theme customization -->
+    <style name="AlertDialogTheme" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="colorAccent">@color/teal_200</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:background">@android:color/black</item>
+    </style>
+
+    <!-- Spinner style customization -->
+    <style name="SpinnerStyle" parent="Widget.AppCompat.Spinner.Underlined">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:popupBackground">@android:color/black</item>
+    </style>
+
+    <!-- EditText style customization -->
+    <style name="EditTextStyle" parent="Widget.AppCompat.EditText">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:background">@android:color/black</item>
+    </style>
+
 </resources>

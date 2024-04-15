@@ -65,7 +65,7 @@ public class CamActivity extends AppCompatActivity
         // Hide the window title.
 //***        requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-        mPrefs = getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0);
+		mPrefs = getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0);
 		mSettings = new PhotoSettings(CamActivity.this);
 
 		if(mSettings.mFullWakeLock)
@@ -111,7 +111,7 @@ public class CamActivity extends AppCompatActivity
 	        	mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MobileWebCam");
 
 	        mWakeLock.acquire();
-//		    Log.v("MobileWebCam", "CamActivity WakeLock aquired!");
+//		    Log.v("MobileWebCam", "CamActivity WakeLock acquired!");
 		    
 		    if(old != null)
 		    	old.release();
@@ -126,7 +126,7 @@ public class CamActivity extends AppCompatActivity
 				{
 					mWifiLock = wmgr.createWifiLock(WifiManager.WIFI_MODE_FULL, "MobileWebCam.CamActivity");
 					mWifiLock.acquire();
-//				    Log.v("MobileWebCam", "CamActivity mWifiLock aquired!");
+//				    Log.v("MobileWebCam", "CamActivity mWifiLock acquired!");
 				}		
 			}		    
 		    
@@ -191,6 +191,21 @@ public class CamActivity extends AppCompatActivity
 			}
 		}
 	}
+
+	// Method to explicitly start the camera preview
+	public void startCameraPreview() {
+		if (mPreview != null) {
+			mPreview.startPreview(); // Assume startPreview() is a method you implement in Preview class
+		}
+	}
+
+	// Method to explicitly stop the camera preview
+	public void stopCameraPreview() {
+		if (mPreview != null) {
+			mPreview.stopPreview(); // Assume stopPreview() is a method you implement in Preview class
+		}
+	}
+
 	private void setupCamera() {
 		if (mPreview != null) {
 			mPreview.onResume();

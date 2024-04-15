@@ -114,4 +114,13 @@
 	</string-array>
 	
 	<string name="battery_imprint_default" formatted="false">Battery %d%% %.1f&#xb0;C</string>
+
+	<string name="channel_name">MobileWebCam Notifications</string>
+	<string name="channel_description">Notification Channel for MobileWebCam</string>
+	<string name="notification_channel_id">de.baarflieger.mobilewebcam</string>
+
+	<string name="servicechannel_name">MobileWebCam Service</string>
+	<string name="servicechannel_description">Notification Channel for MobileWebCam Service Notifications</string>
+	<string name="notification_servicechannel_id">de.baarflieger.mobilewebcam.services</string>
+
 </resources>
