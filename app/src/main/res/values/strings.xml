@@ -123,4 +123,7 @@
 	<string name="servicechannel_description">Notification Channel for MobileWebCam Service Notifications</string>
 	<string name="notification_servicechannel_id">de.baarflieger.mobilewebcam.services</string>
 
+	<string name="device_admin_enabled">Device Admin Enabled</string>
+	<string name="device_admin_disabled">Device Admin Disabled</string>
+
 </resources>
