@@ -92,7 +92,7 @@ public class ActivitySettings extends PreferenceActivity implements OnSharedPref
 				boolean ok = false;
 				try
 				{
-					ok = PhotoService.CheckHiddenCamInit();
+					ok = PhotoService.CheckHiddenCamInit(this);
 				}
 				catch(RuntimeException e)
 				{

@@ -1,30 +1,37 @@
 /* Copyright 2012 Michael Haar
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package de.baarflieger.mobilewebcam;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.hardware.Camera;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
 import android.media.AudioManager;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.widget.Toast;
 
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 @SuppressLint("Instantiatable")
 public class PhotoService
@@ -46,13 +53,16 @@ public class PhotoService
 	}
 	
 	public static volatile Camera mCamera = null;
-	
-	public static boolean CheckHiddenCamInit()
+
+	private static CameraManager cameraManager;
+	private static Handler backgroundHandler;
+	public static boolean CheckHiddenCamInit(Context context)
 	{
 		if(!Preview.mPhotoLock.getAndSet(true))
 		{
 			Preview.mPhotoLockTime = System.currentTimeMillis();
-			Camera cam = Camera.open();
+
+			/*Camera cam = Camera.open();
 			if(cam != null)
 			{
 				cam.startPreview();
@@ -61,9 +71,53 @@ public class PhotoService
 				System.gc();
 				Preview.mPhotoLock.set(false);
 				return true;
+			}*/
+
+			cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+			HandlerThread handlerThread = new HandlerThread("CameraBackground");
+			handlerThread.start();
+			backgroundHandler = new Handler(handlerThread.getLooper());
+
+			final CountDownLatch latch = new CountDownLatch(1);
+			final boolean[] isCameraOpened = {false};  // Array to hold camera open result
+
+			try {
+				String cameraId = cameraManager.getCameraIdList()[0];  // Assuming the device has at least one camera
+				cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
+					@Override
+					public void onOpened(CameraDevice camera) {
+						isCameraOpened[0] = true;
+						camera.close();  // Immediately close the camera after confirming it can open
+						latch.countDown();  // Release the latch
+					}
+
+					@Override
+					public void onDisconnected(CameraDevice camera) {
+						camera.close();
+						latch.countDown();
+					}
+
+					@Override
+					public void onError(CameraDevice camera, int error) {
+						camera.close();
+						latch.countDown();
+					}
+				}, backgroundHandler);
+			} catch (CameraAccessException e) {
+				e.printStackTrace();
+				return false;  // Return false immediately if an exception is caught
 			}
+
+			try {
+				latch.await(2, TimeUnit.SECONDS);  // Wait for the latch to be released, timeout after 2 seconds
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				return false;
+			}
+
+			return isCameraOpened[0];  // Return the result
+
 		}
-		
 		return false;
 	}
 	
@@ -187,6 +241,16 @@ public class PhotoService
 				MobileWebCam.LogE("takePicture failed!");
 				e.printStackTrace();
 				Preview.mPhotoLock.set(false);
+
+				//we try THIS (test CameraView.java)
+				/*Intent i = new Intent(mContext, CameraView.class);
+				i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+				try {
+					mContext.startActivity(i);
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				}*/
 			}
 		}
 		else

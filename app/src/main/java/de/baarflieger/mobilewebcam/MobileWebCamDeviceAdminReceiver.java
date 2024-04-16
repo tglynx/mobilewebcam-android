@@ -49,7 +49,13 @@ public class MobileWebCamDeviceAdminReceiver extends DeviceAdminReceiver {
 
         Intent i = new Intent(context, TakeHiddenPicture.class);
         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(i);
+
+        try {
+            context.startActivity(i);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Override
