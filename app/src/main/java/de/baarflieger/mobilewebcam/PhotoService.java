@@ -18,60 +18,66 @@ package de.baarflieger.mobilewebcam;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.TotalCaptureResult;
 import android.media.AudioManager;
+import android.media.Image;
+import android.media.ImageReader;
+import android.graphics.ImageFormat;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.widget.Toast;
+import android.view.Surface;
 
+import androidx.core.app.ActivityCompat;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.Collections;
 
 @SuppressLint("Instantiatable")
-public class PhotoService
-{
+public class PhotoService {
 	private Handler mHandler = new Handler();
-	
+
 	private Context mContext = null;
-	
+
 	private PhotoSettings mSettings = null;
-	
+
 	private ITextUpdater mTextUpdater = null;
-	
-	public PhotoService(Context c, ITextUpdater tu)
-	{
+
+	//NEW TAKEPICTURE VARIABLES
+	private String mPhotoEvent;
+	private Handler mBackgroundHandler;
+	private CameraDevice mCameraDevice;
+	private CameraCaptureSession mCaptureSession;
+	private ImageReader mImageReader;
+
+	public PhotoService(Context c, ITextUpdater tu) {
 		mContext = c;
 		mTextUpdater = tu;
-		
+
 		mSettings = new PhotoSettings(mContext);
 	}
-	
+
 	public static volatile Camera mCamera = null;
 
 	private static CameraManager cameraManager;
 	private static Handler backgroundHandler;
-	public static boolean CheckHiddenCamInit(Context context)
-	{
-		if(!Preview.mPhotoLock.getAndSet(true))
-		{
-			Preview.mPhotoLockTime = System.currentTimeMillis();
 
-			/*Camera cam = Camera.open();
-			if(cam != null)
-			{
-				cam.startPreview();
-				cam.stopPreview();
-				cam.release();
-				System.gc();
-				Preview.mPhotoLock.set(false);
-				return true;
-			}*/
+	public static boolean CheckHiddenCamInit(Context context) {
+		if (!Preview.mPhotoLock.getAndSet(true)) {
+			Preview.mPhotoLockTime = System.currentTimeMillis();
 
 			cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
 			HandlerThread handlerThread = new HandlerThread("CameraBackground");
@@ -79,16 +85,56 @@ public class PhotoService
 			backgroundHandler = new Handler(handlerThread.getLooper());
 
 			final CountDownLatch latch = new CountDownLatch(1);
-			final boolean[] isCameraOpened = {false};  // Array to hold camera open result
+			final boolean[] isPhotoTaken = {false};
 
 			try {
-				String cameraId = cameraManager.getCameraIdList()[0];  // Assuming the device has at least one camera
+				String cameraId = cameraManager.getCameraIdList()[0];
+
+				if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+					return false;
+				}
 				cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
 					@Override
 					public void onOpened(CameraDevice camera) {
-						isCameraOpened[0] = true;
-						camera.close();  // Immediately close the camera after confirming it can open
-						latch.countDown();  // Release the latch
+						try {
+							ImageReader reader = ImageReader.newInstance(640, 480, ImageFormat.JPEG, 1);
+							Surface surface = reader.getSurface();
+							CaptureRequest.Builder captureRequestBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+							captureRequestBuilder.addTarget(surface);
+
+							reader.setOnImageAvailableListener(imageReader -> {
+								imageReader.acquireLatestImage().close();
+								isPhotoTaken[0] = true;
+								camera.close();
+								latch.countDown();
+							}, backgroundHandler);
+
+							camera.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+								@Override
+								public void onConfigured(CameraCaptureSession session) {
+									try {
+										session.capture(captureRequestBuilder.build(), new CameraCaptureSession.CaptureCallback() {
+											@Override
+											public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+												super.onCaptureCompleted(session, request, result);
+												// Additional confirmation if needed
+											}
+										}, backgroundHandler);
+									} catch (CameraAccessException e) {
+										e.printStackTrace();
+									}
+								}
+
+								@Override
+								public void onConfigureFailed(CameraCaptureSession session) {
+									camera.close();
+									latch.countDown();
+								}
+							}, backgroundHandler);
+						} catch (CameraAccessException e) {
+							camera.close();
+							latch.countDown();
+						}
 					}
 
 					@Override
@@ -105,23 +151,23 @@ public class PhotoService
 				}, backgroundHandler);
 			} catch (CameraAccessException e) {
 				e.printStackTrace();
-				return false;  // Return false immediately if an exception is caught
+				return false;
 			}
 
 			try {
-				latch.await(2, TimeUnit.SECONDS);  // Wait for the latch to be released, timeout after 2 seconds
+				latch.await(5, TimeUnit.SECONDS);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				return false;
 			}
 
-			return isCameraOpened[0];  // Return the result
-
+			Preview.mPhotoLock.set(false);
+			return isPhotoTaken[0];
 		}
 		return false;
 	}
-	
-	public void TakePicture(String event)
+
+	public void TakePictureLegacy(String event)
 	{
 		Log.i("MobileWebCam", "TakePicture");
 		mCamera = null;
@@ -259,7 +305,116 @@ public class PhotoService
 			Preview.mPhotoLock.set(false);
 		}		
 	}
-	
+
+	//START TAKEPICTURE
+	public void TakePicture(String event) {
+
+		mPhotoEvent = event;
+		initializeCamera();
+	}
+
+	private void initializeCamera() {
+		CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+		try {
+			String cameraId = manager.getCameraIdList()[0]; // assuming you are using the back facing camera
+			manager.openCamera(cameraId, stateCallback, mBackgroundHandler);
+		} catch (CameraAccessException e) {
+			Log.e("MobileWebCam", "Cannot access the camera.", e);
+		}
+	}
+
+	private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
+		@Override
+		public void onOpened(CameraDevice cameraDevice) {
+			mCameraDevice = cameraDevice;
+			createCameraPreviewSession();
+		}
+
+		@Override
+		public void onDisconnected(CameraDevice cameraDevice) {
+			cameraDevice.close();
+		}
+
+		@Override
+		public void onError(CameraDevice cameraDevice, int error) {
+			cameraDevice.close();
+			mCameraDevice = null;
+		}
+	};
+
+	private void createCameraPreviewSession() {
+		try {
+			mImageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 1); // Adjust size as needed
+
+			// Set the listener to handle new images.
+			mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+				@Override
+				public void onImageAvailable(ImageReader reader) {
+					try (Image image = reader.acquireNextImage()) {
+						ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+						byte[] bytes = new byte[buffer.remaining()];
+						buffer.get(bytes);
+
+						// Process the image data as needed
+						processImage(bytes, image.getWidth(), image.getHeight());
+					}
+				}
+			}, mBackgroundHandler);
+
+			Surface surface = mImageReader.getSurface();
+			final CaptureRequest.Builder builder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+			builder.addTarget(surface);
+
+			mCameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
+				@Override
+				public void onConfigured(CameraCaptureSession session) {
+					mCaptureSession = session;
+					capturePhoto(builder);
+				}
+
+				@Override
+				public void onConfigureFailed(CameraCaptureSession session) {
+					Log.e("MobileWebCam", "Failed to configure camera.");
+				}
+			}, mBackgroundHandler);
+		} catch (CameraAccessException e) {
+			Log.e("MobileWebCam", "Failed to create capture session.", e);
+		}
+	}
+
+	private void capturePhoto(CaptureRequest.Builder builder) {
+		try {
+			mCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
+				@Override
+				public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+					super.onCaptureCompleted(session, request, result);
+					Log.i("MobileWebCam", "Image captured for event: " + mPhotoEvent);
+					// Here you might handle the image data as it ends up
+				}
+			}, mBackgroundHandler);
+		} catch (CameraAccessException e) {
+			Log.e("MobileWebCam", "Failed to capture photo.", e);
+		}
+	}
+
+	private void processImage(byte[] imageData, int width, int height) {
+		Date date = new Date(); // Capture the current time.
+		Log.i("MobileWebCam", "Image captured");
+
+		Size imageSize = new Size(width, height); // Using the custom Size class to stay somewhat compatible with the legacy camera.size
+		WorkImage work = new WorkImage(mContext, mTextUpdater, imageData, imageSize, date, mPhotoEvent);
+		MobileWebCam.gPictureCounter++;
+
+		// Start the work on a new thread.
+		new Thread(work).start();
+
+		Log.i("MobileWebCam", "Work submitted " + MobileWebCam.gPictureCounter);
+
+	}
+
+	// END TAKEPICTURE
+
+
 	Camera.AutoFocusCallback autofocusCallback = new Camera.AutoFocusCallback() {
 		
 		@Override
@@ -310,7 +465,9 @@ public class PhotoService
 			Camera.Size s = parameters.getPictureSize();
 			if(s != null)
 			{
-				work = new WorkImage(mContext, mTextUpdater, data, s, date, mPhotoEvent);
+
+				Size imageSize = new Size(s.width, s.height);
+				work = new WorkImage(mContext, mTextUpdater, data, imageSize, date, mPhotoEvent);
 				MobileWebCam.gPictureCounter++;
 				
 				mTextUpdater.UpdateText();

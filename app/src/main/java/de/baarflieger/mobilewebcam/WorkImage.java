@@ -53,7 +53,7 @@ import java.util.TimerTask;
 
 public class WorkImage implements Runnable
 {
-	public WorkImage(Context c, ITextUpdater tu, byte[] data, Camera.Size s, Date date, String event)
+	public WorkImage(Context c, ITextUpdater tu, byte[] data, Size s, Date date, String event)
 	{
 		mTextUpdater = tu;
 		mContext = c;
@@ -72,7 +72,7 @@ public class WorkImage implements Runnable
 	private Date mDate = null;
 	private String mPhotoEvent = null;
 	private static Bitmap gBmp = null;	
-	private Camera.Size size = null;
+	private Size size = null;
 	private PhotoSettings mSettings = null;
 	
 	private LocationManager locationManager;

@@ -1020,15 +1020,16 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 			Log.i("MobileWebCam", "mPostPicture.photoCallback");
 			
 			WorkImage work = null;
-			Camera.Size size = null;
+			Camera.Size s = null;
 			if(mCamera != null)
 			{
 				Camera.Parameters parameters = camera.getParameters();
-				size = parameters.getPictureSize();
+				s = parameters.getPictureSize();
 			}
-			if(size != null)
+			if(s != null)
 			{
-				work = new WorkImage(mActivity, Preview.this, data, size, date, mPhotoEvent);
+				Size imageSize = new Size(s.width, s.height);
+				work = new WorkImage(mActivity, Preview.this, data, imageSize, date, mPhotoEvent);
 				MobileWebCam.gPictureCounter++;
 				
 				UpdateText();
@@ -1271,15 +1272,16 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 					}
 				}
 				
-				Camera.Size size = null;
+				Camera.Size s = null;
 				if(mCamera != null)
 				{
 					Camera.Parameters parameters = mCamera.getParameters();
 					if(parameters != null)
-						size = parameters.getPictureSize();
+						s = parameters.getPictureSize();
 				}
-				
-				final WorkImage work = new WorkImage(mActivity, this, data, size, new Date(), "offline");
+
+				Size imageSize = new Size(s.width, s.height);
+				final WorkImage work = new WorkImage(mActivity, this, data, imageSize, new Date(), "offline");
 //				mHandler.post(work);
 				new Thread(work).start();
 	    	}
