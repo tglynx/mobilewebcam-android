@@ -38,11 +38,15 @@ import androidx.core.content.ContextCompat;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
 
 public class CamActivity extends AppCompatActivity
 {
-	private static final int REQUEST_CAMERA_PERMISSION = 1;
+	private static final int REQUEST_PERMISSIONS_CODE = 101; // You can use any integer here
     public PhotoSettings mSettings = null;
     
     protected Preview mPreview = null;
@@ -101,14 +105,24 @@ public class CamActivity extends AppCompatActivity
 			}
 		}
 
-		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-				!= PackageManager.PERMISSION_GRANTED) {
-			// Camera permission has not been granted.
+		List<String> permissionsNeeded = new ArrayList<>();
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+			permissionsNeeded.add(Manifest.permission.CAMERA);
+		}
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
+			permissionsNeeded.add(Manifest.permission.FOREGROUND_SERVICE);
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+				ContextCompat.checkSelfPermission(this, "android.permission.FOREGROUND_SERVICE_CAMERA") != PackageManager.PERMISSION_GRANTED) {
+			permissionsNeeded.add("android.permission.FOREGROUND_SERVICE_CAMERA");
+		}
+
+		if (!permissionsNeeded.isEmpty()) {
 			ActivityCompat.requestPermissions(this,
-					new String[]{Manifest.permission.CAMERA},
-					REQUEST_CAMERA_PERMISSION);
+					permissionsNeeded.toArray(new String[0]),
+					REQUEST_PERMISSIONS_CODE);
 		} else {
-			// Camera permission has been granted, continue with camera setup.
+			// Permissions are already granted, do the task
 			setupCamera();
 		}
 
@@ -192,20 +206,22 @@ public class CamActivity extends AppCompatActivity
 				tmpwifi.release();
 		}
     }
+
 	@Override
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
 		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-		if (requestCode == REQUEST_CAMERA_PERMISSION) {
-			if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-				// Camera permission has been granted, preview can be displayed
-				Toast.makeText(this, "Camera permission was granted.", Toast.LENGTH_SHORT).show();
+		if (requestCode == REQUEST_PERMISSIONS_CODE) {
+			if (grantResults.length > 0 && Arrays.stream(grantResults).allMatch(result -> result == PackageManager.PERMISSION_GRANTED)) {
+				// Permissions granted
+				Toast.makeText(this, "Camera service permissions are granted.", Toast.LENGTH_SHORT).show();
 				setupCamera();
 			} else {
-				// Camera permission was denied, disable camera functionality or inform the user.
-				Toast.makeText(this, "Camera permission request was denied.", Toast.LENGTH_SHORT).show();
+				// Permissions are denied
+				Toast.makeText(this, "All permissions are required for this app to function properly.", Toast.LENGTH_LONG).show();
 			}
 		}
 	}
+
 
 	// Method to explicitly start the camera preview
 	public void startCameraPreview() {
