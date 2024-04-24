@@ -109,9 +109,6 @@ public class CamActivity extends AppCompatActivity
 		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
 			permissionsNeeded.add(Manifest.permission.CAMERA);
 		}
-		if (ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
-			permissionsNeeded.add(Manifest.permission.FOREGROUND_SERVICE);
-		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
 				ContextCompat.checkSelfPermission(this, "android.permission.FOREGROUND_SERVICE_CAMERA") != PackageManager.PERMISSION_GRANTED) {
 			permissionsNeeded.add("android.permission.FOREGROUND_SERVICE_CAMERA");

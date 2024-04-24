@@ -21,11 +21,15 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.AudioManager;
 import android.media.Image;
 import android.media.ImageReader;
@@ -33,13 +37,16 @@ import android.graphics.ImageFormat;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.util.Range;
 import android.widget.Toast;
 import android.view.Surface;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -177,7 +184,7 @@ public class PhotoService {
 			return;
 		}
 		Preview.mPhotoLockTime = System.currentTimeMillis();
-		
+
 		try
 		{
 			if(mSettings.mFrontCamera || NewCameraFunctions.getNumberOfCameras() == 1 && NewCameraFunctions.isFrontCamera(0))
@@ -185,7 +192,7 @@ public class PhotoService {
 				Log.v("MobileWebCam", "Trying to open CAMERA 1!");
 				mCamera = NewCameraFunctions.openFrontCamera();
 			}
-			
+
 			if(mCamera == null)
 			{
 				try
@@ -197,7 +204,7 @@ public class PhotoService {
 					e.printStackTrace();
 					if(e.getMessage() != null)
 					{
-						MobileWebCam.LogE(e.getMessage());						
+						MobileWebCam.LogE(e.getMessage());
 						mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 					}
 				}
@@ -235,13 +242,13 @@ public class PhotoService {
 		if(mCamera != null)
 		{
 			mCamera.startPreview();
-			
+
 			if(!mSettings.mShutterSound)
 			{
 				AudioManager mgr = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
 				mgr.setStreamMute(AudioManager.STREAM_SYSTEM, true);
-			}			
-			
+			}
+
 			Camera.Parameters params = mCamera.getParameters();
 			if(params != null)
 			{
@@ -265,13 +272,13 @@ public class PhotoService {
 	        				}
 	        			}
 	        		}
-				}				
+				}
 				mSettings.SetCameraParameters(params, false);
         		mCamera.setParameters(params);
 			}
-			
-			MobileWebCam.gLastMotionKeepAliveTime = System.currentTimeMillis();			
-			
+
+			MobileWebCam.gLastMotionKeepAliveTime = System.currentTimeMillis();
+
 			Log.i("MobileWebCam", "takePicture");
 /*			if(mSettings.mAutoFocus)
 				mCamera.autoFocus(autofocusCallback);
@@ -303,22 +310,38 @@ public class PhotoService {
 		{
 			mTextUpdater.Toast("Error: unable to open camera", Toast.LENGTH_SHORT);
 			Preview.mPhotoLock.set(false);
-		}		
+		}
 	}
 
 	//START TAKEPICTURE
 	public void TakePicture(String event) {
 
+		Log.i("MobileWebCam", "TakePicture");
+		if(Preview.mPhotoLock.getAndSet(true))
+		{
+			Log.w("MobileWebCam", "Photo locked!");
+			return;
+		}
+		Preview.mPhotoLockTime = System.currentTimeMillis();
+
 		mPhotoEvent = event;
 		initializeCamera();
 	}
 
+	@SuppressLint("MissingPermission")
 	private void initializeCamera() {
 		CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
 		try {
-			String cameraId = manager.getCameraIdList()[0]; // assuming you are using the back facing camera
-			manager.openCamera(cameraId, stateCallback, mBackgroundHandler);
+			String cameraId = getCameraId(manager, mSettings.mFrontCamera);
+			if (cameraId != null) {
+				manager.openCamera(cameraId, stateCallback, mBackgroundHandler);
+			} else {
+				mTextUpdater.Toast("Suitable camera not found", Toast.LENGTH_SHORT);
+				throw new CameraAccessException(CameraAccessException.CAMERA_ERROR, "Suitable camera not found");
+			}
 		} catch (CameraAccessException e) {
+			Preview.mPhotoLock.set(false);
+			mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 			Log.e("MobileWebCam", "Cannot access the camera.", e);
 		}
 	}
@@ -327,24 +350,55 @@ public class PhotoService {
 		@Override
 		public void onOpened(CameraDevice cameraDevice) {
 			mCameraDevice = cameraDevice;
-			createCameraPreviewSession();
+
+			CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+
+			try {
+				CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
+				// Get supported picture sizes for JPEG format
+				StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+				android.util.Size[] sizes = map.getOutputSizes(ImageFormat.JPEG);
+
+				// Select a size - for example, the largest available size.
+				android.util.Size selectedSize = Collections.max(Arrays.asList(sizes), new CompareSizesByArea());
+
+				if (mSettings.mImageSize == 5) {
+					// Find best matching size (next larger or exact size)
+					for (android.util.Size size : sizes) {
+						if (size.getWidth() >= mSettings.mCustomImageW && size.getHeight() >= mSettings.mCustomImageH) {
+							selectedSize = size;
+							break;
+						}
+					}
+				}
+
+				createCameraPreviewSession(selectedSize);
+			} catch (CameraAccessException e) {
+				e.printStackTrace();
+				Preview.mPhotoLock.set(false);
+				mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
+			}
 		}
 
 		@Override
 		public void onDisconnected(CameraDevice cameraDevice) {
+
 			cameraDevice.close();
+			Preview.mPhotoLock.set(false);
+
 		}
 
 		@Override
 		public void onError(CameraDevice cameraDevice, int error) {
 			cameraDevice.close();
 			mCameraDevice = null;
+			Preview.mPhotoLock.set(false);
 		}
 	};
 
-	private void createCameraPreviewSession() {
+	private void createCameraPreviewSession(android.util.Size selectedSize) {
 		try {
-			mImageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 1); // Adjust size as needed
+			mImageReader = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1); // Adjust size as needed
 
 			// Set the listener to handle new images.
 			mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
@@ -356,6 +410,7 @@ public class PhotoService {
 						buffer.get(bytes);
 
 						// Process the image data as needed
+						MobileWebCam.gLastMotionKeepAliveTime = System.currentTimeMillis();
 						processImage(bytes, image.getWidth(), image.getHeight());
 					}
 				}
@@ -363,7 +418,20 @@ public class PhotoService {
 
 			Surface surface = mImageReader.getSurface();
 			final CaptureRequest.Builder builder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+			builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
 			builder.addTarget(surface);
+
+			CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+			CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraDevice.getId());
+
+			// Check if the camera supports auto-exposure compensation
+			Range<Integer> aeCompensationRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+			if (aeCompensationRange != null) {
+				int compensationValue = -4; // Define this based on your needs
+				if (aeCompensationRange.contains(compensationValue)) {
+					builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, compensationValue);
+				}
+			}
 
 			mCameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
 				@Override
@@ -374,10 +442,13 @@ public class PhotoService {
 
 				@Override
 				public void onConfigureFailed(CameraCaptureSession session) {
+					Preview.mPhotoLock.set(false);
 					Log.e("MobileWebCam", "Failed to configure camera.");
 				}
 			}, mBackgroundHandler);
+
 		} catch (CameraAccessException e) {
+			Preview.mPhotoLock.set(false);
 			Log.e("MobileWebCam", "Failed to create capture session.", e);
 		}
 	}
@@ -393,6 +464,7 @@ public class PhotoService {
 				}
 			}, mBackgroundHandler);
 		} catch (CameraAccessException e) {
+			mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 			Log.e("MobileWebCam", "Failed to capture photo.", e);
 		}
 	}
@@ -408,20 +480,35 @@ public class PhotoService {
 		// Start the work on a new thread.
 		new Thread(work).start();
 
+		Preview.mPhotoLock.set(false);
 		Log.i("MobileWebCam", "Work submitted " + MobileWebCam.gPictureCounter);
 
 	}
 
+	private String getCameraId(CameraManager manager, boolean useFrontCamera) throws CameraAccessException {
+		String[] cameraIdList = manager.getCameraIdList();
+		for (String cameraId : cameraIdList) {
+			CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+			Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+			if (lensFacing != null) {
+				if ((useFrontCamera && lensFacing == CameraCharacteristics.LENS_FACING_FRONT) ||
+						(!useFrontCamera && lensFacing == CameraCharacteristics.LENS_FACING_BACK)) {
+					return cameraId;
+				}
+			}
+		}
+		return null;
+	}
 	// END TAKEPICTURE
 
 
 	Camera.AutoFocusCallback autofocusCallback = new Camera.AutoFocusCallback() {
-		
+
 		@Override
 		public void onAutoFocus(boolean success, Camera camera)
 		{
 			Log.i("MobileWebCam", "takePicture onAutoFocus");
-			
+
 			// take picture now
 			mHandler.post(new Runnable()
 			{
@@ -429,7 +516,7 @@ public class PhotoService {
 				public void run()
 				{
 					Log.i("MobileWebCam", "takePicture onAutoFocus.run");
-					
+
 					if(mCamera != null)
 						mCamera.takePicture(shutterCallback, null, photoCallback);
 
@@ -437,7 +524,7 @@ public class PhotoService {
 				}
 			});
 		}
-	};	
+	};
 
 	Camera.ShutterCallback shutterCallback = new Camera.ShutterCallback()
 	{
@@ -518,5 +605,7 @@ public class PhotoService {
 					}
 				});
 		}
-	};	
+	};
+
 }
+
