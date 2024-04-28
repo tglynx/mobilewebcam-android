@@ -38,6 +38,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Range;
+import android.view.TextureView;
 import android.widget.Toast;
 import android.view.Surface;
 
@@ -45,6 +46,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
@@ -69,6 +71,7 @@ public class PhotoService {
 	private CameraDevice mCameraDevice;
 	private CameraCaptureSession mCaptureSession;
 	private ImageReader mImageReader;
+	private ImageReader mImageReaderPreview;
 
 	public PhotoService(Context c, ITextUpdater tu) {
 		mContext = c;
@@ -79,14 +82,14 @@ public class PhotoService {
 
 	public static volatile Camera mCamera = null;
 
-	private static CameraManager cameraManager;
+	private static CameraManager mCameraManager;
 	private static Handler backgroundHandler;
 
 	public static boolean CheckHiddenCamInit(Context context) {
 		if (!Preview.mPhotoLock.getAndSet(true)) {
 			Preview.mPhotoLockTime = System.currentTimeMillis();
 
-			cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+			mCameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
 			HandlerThread handlerThread = new HandlerThread("CameraBackground");
 			handlerThread.start();
 			backgroundHandler = new Handler(handlerThread.getLooper());
@@ -95,12 +98,12 @@ public class PhotoService {
 			final boolean[] isPhotoTaken = {false};
 
 			try {
-				String cameraId = cameraManager.getCameraIdList()[0];
+				String cameraId = mCameraManager.getCameraIdList()[0];
 
 				if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
 					return false;
 				}
-				cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
+				mCameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
 					@Override
 					public void onOpened(CameraDevice camera) {
 						try {
@@ -330,11 +333,11 @@ public class PhotoService {
 
 	@SuppressLint("MissingPermission")
 	private void initializeCamera() {
-		CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+		mCameraManager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
 		try {
-			String cameraId = getCameraId(manager, mSettings.mFrontCamera);
+			String cameraId = getCameraId(mCameraManager, mSettings.mFrontCamera);
 			if (cameraId != null) {
-				manager.openCamera(cameraId, stateCallback, mBackgroundHandler);
+				mCameraManager.openCamera(cameraId, stateCallback, mBackgroundHandler);
 			} else {
 				mTextUpdater.Toast("Suitable camera not found", Toast.LENGTH_SHORT);
 				throw new CameraAccessException(CameraAccessException.CAMERA_ERROR, "Suitable camera not found");
@@ -351,10 +354,8 @@ public class PhotoService {
 		public void onOpened(CameraDevice cameraDevice) {
 			mCameraDevice = cameraDevice;
 
-			CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
-
 			try {
-				CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
+				CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(cameraDevice.getId());
 				// Get supported picture sizes for JPEG format
 				StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 				android.util.Size[] sizes = map.getOutputSizes(ImageFormat.JPEG);
@@ -398,13 +399,31 @@ public class PhotoService {
 
 	private void createCameraPreviewSession(android.util.Size selectedSize) {
 		try {
-			mImageReader = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1); // Adjust size as needed
+
+			mImageReaderPreview = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1);
+			mImageReader = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1);
 
 			// Set the listener to handle new images.
-			mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+
+			mImageReaderPreview.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
 				@Override
 				public void onImageAvailable(ImageReader reader) {
 					try (Image image = reader.acquireNextImage()) {
+						ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+						byte[] bytes = new byte[buffer.remaining()];
+						buffer.get(bytes);
+
+						Log.i("MobileWebCam", "Image preview updated");
+
+					}
+				}
+			}, mBackgroundHandler);
+
+			mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+				@Override
+				public void onImageAvailable(ImageReader reader) {
+					try (Image image = reader.acquireLatestImage()) {
+
 						ByteBuffer buffer = image.getPlanes()[0].getBuffer();
 						byte[] bytes = new byte[buffer.remaining()];
 						buffer.get(bytes);
@@ -417,27 +436,58 @@ public class PhotoService {
 			}, mBackgroundHandler);
 
 			Surface surface = mImageReader.getSurface();
+			Surface previewSurface = mImageReaderPreview.getSurface();
+
+			List<Surface> surfaces = new ArrayList<>();
+			surfaces.add(surface);
+			surfaces.add(previewSurface);
+
+			final CaptureRequest.Builder previewBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+			previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			previewBuilder.addTarget(previewSurface);
+
 			final CaptureRequest.Builder builder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
 			builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
 			builder.addTarget(surface);
 
-			CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
-			CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraDevice.getId());
+			previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			previewBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+			previewBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
+
+			builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+			builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
+
+			/*CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
 
 			// Check if the camera supports auto-exposure compensation
 			Range<Integer> aeCompensationRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
 			if (aeCompensationRange != null) {
-				int compensationValue = -4; // Define this based on your needs
+				int compensationValue = 0; // Define this based on your needs
 				if (aeCompensationRange.contains(compensationValue)) {
 					builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, compensationValue);
 				}
-			}
+			}*/
 
-			mCameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
+			mCameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
 				@Override
 				public void onConfigured(CameraCaptureSession session) {
+
+					previewBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,getRange());
+					builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,getRange());
+
 					mCaptureSession = session;
-					capturePhoto(builder);
+
+					try {
+						mCaptureSession.setRepeatingRequest(previewBuilder.build(), null, backgroundHandler);
+
+						Handler delayHandler = new Handler();
+						delayHandler.postDelayed(() -> capturePhoto(builder), mSettings.mDelayAfterCameraOpened);
+
+					} catch (CameraAccessException e) {
+						throw new RuntimeException(e);
+					}
+
 				}
 
 				@Override
@@ -453,16 +503,41 @@ public class PhotoService {
 		}
 	}
 
+	private Range<Integer> getRange() {
+		CameraCharacteristics chars = null;
+		try {
+			chars = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
+			Range<Integer>[] ranges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+			Range<Integer> result = null;
+			for (Range<Integer> range : ranges) {
+				int upper = range.getUpper();
+				// 10 - min range upper for my needs
+				if (upper >= 10) {
+					if (result == null || upper < result.getUpper().intValue()) {
+						result = range;
+					}
+				}
+			}
+			if (result == null) {
+				result = ranges[0];
+			}
+			return result;
+		} catch (CameraAccessException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
 	private void capturePhoto(CaptureRequest.Builder builder) {
 		try {
+			mCaptureSession.stopRepeating();
 			mCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
 				@Override
 				public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
 					super.onCaptureCompleted(session, request, result);
 					Log.i("MobileWebCam", "Image captured for event: " + mPhotoEvent);
-					// Here you might handle the image data as it ends up
 				}
 			}, mBackgroundHandler);
+
 		} catch (CameraAccessException e) {
 			mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 			Log.e("MobileWebCam", "Failed to capture photo.", e);
