@@ -109,15 +109,16 @@ public class CamActivity extends AppCompatActivity
 		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
 			permissionsNeeded.add(Manifest.permission.CAMERA);
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-				ContextCompat.checkSelfPermission(this, "android.permission.FOREGROUND_SERVICE_CAMERA") != PackageManager.PERMISSION_GRANTED) {
-			permissionsNeeded.add("android.permission.FOREGROUND_SERVICE_CAMERA");
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+				ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
+			permissionsNeeded.add(Manifest.permission.FOREGROUND_SERVICE);
+		}
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
 		}
 
 		if (!permissionsNeeded.isEmpty()) {
-			ActivityCompat.requestPermissions(this,
-					permissionsNeeded.toArray(new String[0]),
-					REQUEST_PERMISSIONS_CODE);
+			ActivityCompat.requestPermissions(this, permissionsNeeded.toArray(new String[0]), REQUEST_PERMISSIONS_CODE);
 		} else {
 			// Permissions are already granted, do the task
 			setupCamera();

@@ -25,12 +25,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
+
     <!-- Permissions necessary for camera usage -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Permission necessary for running foreground services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Permission necessary for using the camera in foreground services on Android 13 and above -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <application
         android:icon="@drawable/icon"
@@ -55,8 +54,8 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
         </activity>
 
-        <service android:name="de.baarflieger.mobilewebcam.PhotoService"/>
-        <service android:name="de.baarflieger.mobilewebcam.CustomReceiverService"/>
+        <service android:name="de.baarflieger.mobilewebcam.PhotoService" android:foregroundServiceType="camera" android:exported="false"/>
+        <service android:name="de.baarflieger.mobilewebcam.CustomReceiverService" android:foregroundServiceType="camera" android:exported="false"/>
 
         <activity
             android:label="@string/webcam_settings"

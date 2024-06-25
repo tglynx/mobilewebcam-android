@@ -1355,16 +1355,14 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 			if(mPreviewBitmap != null)
 				mPreviewBitmap.recycle();
 			mPreviewBitmap = null;
-			
-			int w = Math.min(image.getWidth(), 384);
-			float scale = (float)image.getWidth() / (float)w;
-			int h = (int)((float)image.getHeight() * scale);
-			if(w < h)
-			{
-				h = Math.min(image.getHeight(), 384);
-				scale = (float)image.getHeight() / (float)h;
-				w = (int)((float)image.getWidth() * scale);
-			}
+
+			// Determine the maximum dimension size
+			int maxDimension = 384;
+
+			// Calculate the scale to fit the image within the maximum dimensions while maintaining aspect ratio
+			float scale = Math.min((float)maxDimension / image.getWidth(), (float)maxDimension / image.getHeight());
+			int w = Math.round(image.getWidth() * scale);
+			int h = Math.round(image.getHeight() * scale);
 	
 			try
 			{
@@ -1373,12 +1371,10 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, ITex
 			catch(OutOfMemoryError e)
 			{
 				MobileWebCam.LogI("Not enough memory for fullsize preview!");
-				try
-				{
-					mPreviewBitmap = Bitmap.createScaledBitmap(image, image.getWidth() / 20, image.getHeight() / 20, true);
-				}
-				catch(OutOfMemoryError e1)
-				{
+				// Attempt a more drastic downscale if the first fails
+				try {
+					mPreviewBitmap = Bitmap.createScaledBitmap(image, w / 2, h / 2, true);
+				} catch (OutOfMemoryError e1) {
 					e1.printStackTrace();
 				}
 			}
