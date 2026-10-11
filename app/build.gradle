@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace 'de.baarflieger.mobilewebcam'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "de.baarflieger.mobilewebcam"
         minSdk 24
-        targetSdk 33
-        versionCode 1
-        versionName "1.0"
+        targetSdk 34
+        versionCode 2
+        versionName '2.0'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,28 +24,26 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
-    packagingOptions {
-        // Exclude META-INF/DEPENDENCIES file to resolve the conflict
-        exclude 'META-INF/DEPENDENCIES'
-        // Add additional excludes here as needed
+    packaging {
+        resources {
+            excludes += 'META-INF/DEPENDENCIES'
+        }
     }
 }
 
 dependencies {
 
-    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'com.google.android.material:material:1.11.0'
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    implementation 'commons-net:commons-net:3.6'
-    implementation 'androidx.core:core:1.7.0'
-    implementation 'androidx.appcompat:appcompat:1.4.1'
+    implementation 'commons-net:commons-net:3.10.0'
     implementation 'com.github.QuadFlask:colorpicker:0.0.15'
     implementation project(':openCVLibrary')
     testImplementation 'junit:junit:4.13.2'
