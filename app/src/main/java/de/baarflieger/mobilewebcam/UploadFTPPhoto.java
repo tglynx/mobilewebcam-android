@@ -16,31 +16,50 @@ package de.baarflieger.mobilewebcam;
 
 import android.content.Context;
 
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpException;
+
 import org.apache.commons.net.ftp.FTPClient;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Properties;
 
 public class UploadFTPPhoto extends Upload
 {
 	public static class FTPConnection
 	{
-		public static FTPClient client		= null;
-	};
-			
+		public static FTPClient client = null;
+		public static Session sftpSession = null;
+		public static ChannelSftp sftpChannel = null;
+	}
+
 	protected UploadFTPPhoto(Context c, ITextUpdater tu, PhotoSettings s, byte[] jpeg, Date date, String event)
 	{
 		super(c, tu, s, jpeg, date, event);
+	}
+
+	private static void disconnectSFTP()
+	{
+		if (FTPConnection.sftpChannel != null)
+		{
+			try { FTPConnection.sftpChannel.disconnect(); } catch (Exception ignored) {}
+			FTPConnection.sftpChannel = null;
+		}
+		if (FTPConnection.sftpSession != null)
+		{
+			try { FTPConnection.sftpSession.disconnect(); } catch (Exception ignored) {}
+			FTPConnection.sftpSession = null;
+		}
 	}
 
 	@Override
@@ -48,48 +67,47 @@ public class UploadFTPPhoto extends Upload
 	{
 		doInBackgroundBegin();
 
-		if(mSettings.mRefreshDuration >= 10 && (mSettings.mFTPBatch == 1 || ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) == 0)))
+		if (mSettings.mRefreshDuration >= 10 && (mSettings.mFTPBatch == 1 || ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) == 0)))
 			publishProgress(mContext.getString(R.string.uploading, mSettings.mFTP + mSettings.mFTPDir));
-		else if(mSettings.mFTPBatch > 1 || ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) != 0))
+		else if (mSettings.mFTPBatch > 1 || ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) != 0))
 			publishProgress("batch ftp store");
-		
+
 ftpupload:	{
 			try
-			{				 
-		        BufferedInputStream buffIn = null;
-		        buffIn = new BufferedInputStream(new ByteArrayInputStream(mJpeg));
-		 
-	            SimpleDateFormat sdf = new SimpleDateFormat ("yyyyMMddHHmmss");
+			{
+				BufferedInputStream buffIn = null;
+				buffIn = new BufferedInputStream(new ByteArrayInputStream(mJpeg));
 
-	            String filename = mSettings.mDefaultname;
-		        if(mSettings.mFTPKeepPics == 0)
-		        {
-			        if(mSettings.mFTPNumbered)
-			        {
-				        if(mSettings.mFTPTimestamp)
-				        	filename = MobileWebCam.gPictureCounter + sdf.format(mDate) + ".jpg";
-				        else
-				        	filename = MobileWebCam.gPictureCounter + ".jpg";
-			        }
-			        else if(mSettings.mFTPTimestamp)
-			        {
-			        	filename = sdf.format(mDate) + ".jpg";
-			        }
-		        }
-		        
-		        boolean result = false;
-		        boolean deletetmpfile = false;
-		        boolean upload_now = true;
-				if(mSettings.mStoreGPS)
+				SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+
+				String filename = mSettings.mDefaultname;
+				if (mSettings.mFTPKeepPics == 0)
 				{
-        			try
+					if (mSettings.mFTPNumbered)
+					{
+						if (mSettings.mFTPTimestamp)
+							filename = MobileWebCam.gPictureCounter + sdf.format(mDate) + ".jpg";
+						else
+							filename = MobileWebCam.gPictureCounter + ".jpg";
+					}
+					else if (mSettings.mFTPTimestamp)
+					{
+						filename = sdf.format(mDate) + ".jpg";
+					}
+				}
+
+				boolean result = false;
+				boolean deletetmpfile = false;
+				boolean upload_now = true;
+				if (mSettings.mStoreGPS)
+				{
+					try
 					{
 						byte[] buffer = new byte[1024 * 8];
-						// Creates a file in the internal, app private storage
 						FileOutputStream fos;
 						fos = mContext.openFileOutput(filename, Context.MODE_PRIVATE);
 						int r = 0;
-						while((r = buffIn.read(buffer)) > -1)
+						while ((r = buffIn.read(buffer)) > -1)
 							fos.write(buffer, 0, r);
 						buffIn.close();
 						fos.close();
@@ -97,7 +115,6 @@ ftpupload:	{
 					}
 					catch (Exception e)
 					{
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 						MobileWebCam.LogE("No file to write EXIF gps tag!");
 					}
@@ -105,179 +122,270 @@ ftpupload:	{
 					File filePath = mContext.getFilesDir();
 					File file = new File(filePath, filename);
 					ExifWrapper.addCoordinates(file.getAbsolutePath(), WorkImage.gLatitude, WorkImage.gLongitude, WorkImage.gAltitude);
-        			
-        			buffIn = new BufferedInputStream(mContext.openFileInput(filename));
+
+					buffIn = new BufferedInputStream(mContext.openFileInput(filename));
 				}
-				else if(mSettings.mFTPBatch > 1 && ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) != 0))
+				else if (mSettings.mFTPBatch > 1 && ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) != 0))
 				{
-					// store picture for later upload!
 					byte[] buffer = new byte[1024 * 8];
 					FileOutputStream fos = mContext.openFileOutput(filename, Context.MODE_PRIVATE);
 					int r = 0;
-					while((r = buffIn.read(buffer)) > -1)
+					while ((r = buffIn.read(buffer)) > -1)
 						fos.write(buffer, 0, r);
 					buffIn.close();
 					fos.close();
 					upload_now = false;
 				}
-				
-				if(upload_now)
+
+				if (upload_now)
 				{
-					FTPConnection.client = new FTPClient();  
-					FTPConnection.client.connect(InetAddress.getByName(mSettings.mFTP), mSettings.mFTPPort);
-					
-					FTPConnection.client.login(mSettings.mFTPLogin, mSettings.mFTPPassword);
-					if(!FTPConnection.client.getReplyString().contains("230"))
-				    {
-				    	publishProgress("wrong ftp login response: " + FTPConnection.client.getReplyString() + "\nAre your credentials correct?");
-				    	MobileWebCam.LogE("wrong ftp login response: " + FTPConnection.client.getReplyString() + "\nAre your credentials correct?");
-				    	FTPConnection.client = null;
-				    	break ftpupload;
-				    }
-
-					FTPConnection.client.changeWorkingDirectory(mSettings.mFTPDir);
-					if(!FTPConnection.client.getReplyString().contains("250"))
-				    {
-				    	publishProgress("wrong ftp cwd response: " + FTPConnection.client.getReplyString() + "\nIs the directory correct?");
-				    	MobileWebCam.LogE("wrong ftp cwd response: " + FTPConnection.client.getReplyString() + "\nIs the directory correct?");
-				    	FTPConnection.client = null;
-				    	break ftpupload;
-				    }
-
-					FTPConnection.client.setFileType(org.apache.commons.net.ftp.FTP.BINARY_FILE_TYPE);
-
-			        if(mSettings.mFTPPassive)
-			        	FTPConnection.client.enterLocalPassiveMode();
-			        else
-			        	FTPConnection.client.enterLocalActiveMode();
-					
-			        if(mSettings.mFTPKeepPics > 0)
-			        {
-			        	String replacename = filename.replace(".jpg", "");  
-			        	// rename old pictures first
-			        	for(int i = mSettings.mFTPKeepPics - 1; i > 0; i--)
-			        	{
-			        		try
-			        		{
-								FTPConnection.client.rename(replacename + i + ".jpg", replacename + (i + 1) + ".jpg");
-			        		}
-			        		catch(IOException e)
-			        		{
-			        		}
-			        	}
-		        		try
-		        		{
-							FTPConnection.client.rename(mSettings.mDefaultname, replacename + "1.jpg");
-		        		}
-		        		catch(Exception e)
-		        		{
-		        			if(e.getMessage() != null)
-		        				MobileWebCam.LogE(e.getMessage());
-		        			e.printStackTrace();
-		        		}
-			        }						
-					
-					do
+					if ("SFTP".equalsIgnoreCase(mSettings.mFTPProtocol))
 					{
-						// upload now
-						result = FTPConnection.client.storeFile(filename, buffIn);
-				        buffIn.close();
-				        buffIn = null;
-				        
-				        if(deletetmpfile)
-				        	mContext.deleteFile(filename);
-				        
-				        if(mSettings.mFTPBatch > 1 || mSettings.mReliableUpload)
-				        {
-				        	// find older pictures not sent yet
-				        	File file = mContext.getFilesDir();
-				        	String[] pics = file.list(new FilenameFilter()
-				        		{
-				        			public boolean accept(File dir, String filename)
-				        			{
-				        				if(filename.endsWith(".jpg"))
-				        					return true;
-				        				return false;
-				        			}
-				        		});
-				        	if(pics.length > 0)
-				        	{
-				        		filename = pics[0];
-			        			buffIn = new BufferedInputStream(mContext.openFileInput(filename));
-			        			deletetmpfile = true; // delete this file after upload!
-			        			// rerun
-			        			MobileWebCam.LogI("ftp batched upload: " + filename);
-				        	}
-				        }
+						result = performSFTPUpload(filename, buffIn, deletetmpfile);
 					}
-					while(buffIn != null);
-					
-			        InputStream logIS = null;
-					if(mSettings.mLogUpload)
+					else
 					{
-						String log = MobileWebCam.GetLog(mContext, mContext.getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0), mSettings);
-				        logIS = new ByteArrayInputStream(log.getBytes("UTF-8"));					
-						if(logIS != null)
-						{
-							result &= FTPConnection.client.storeFile("log.txt", logIS);
-						}
-					}
-					
-			        if(result)
-			        {
-				    	publishProgress("ok");
-				    	MobileWebCam.LogI("ok");
-			        }
-			        else
-			        {
-				    	publishProgress("ftp error: " + FTPConnection.client.getReplyString());
-				    	MobileWebCam.LogE("ftp error: " + FTPConnection.client.getReplyString());
-			        }
-
-					if(!mSettings.mFTPKeepConnected)
-					{
-						FTPConnection.client.logout();
-						FTPConnection.client.disconnect();
-						FTPConnection.client = null;
+						result = performFTPUpload(filename, buffIn, deletetmpfile);
 					}
 				}
 			}
-			catch (SocketException e)
+			catch (Exception e)
 			{
 				e.printStackTrace();
-				publishProgress("Ftp socket exception!");
-				MobileWebCam.LogE("Ftp socket exception!");
-				FTPConnection.client = null;
-			}
-			catch (UnknownHostException e)
-			{
-				e.printStackTrace();
-				publishProgress("Unknown ftp host!");
-				MobileWebCam.LogE("Unknown ftp host!");
-				FTPConnection.client = null;
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-				if(e.getMessage() != null)
+				if (e.getMessage() != null)
 				{
-					publishProgress("IOException: ftp\n" + e.getMessage());
-					MobileWebCam.LogE("IOException: ftp\n" + e.getMessage());
+					publishProgress("Upload exception:\n" + e.getMessage());
+					MobileWebCam.LogE("Upload exception:\n" + e.getMessage());
 				}
 				else
 				{
-					publishProgress("ftp IOException");
-					MobileWebCam.LogE("ftp IOException");
+					publishProgress("Upload exception");
+					MobileWebCam.LogE("Upload exception");
 				}
 				FTPConnection.client = null;
-			}
-			catch (NullPointerException e)
-			{
-				MobileWebCam.LogE("NullPointerException:\n" + e.getMessage());
-				FTPConnection.client = null;
+				disconnectSFTP();
 			}
 		}
-			
+
 		doInBackgroundEnd(mSettings.mFTPBatch == 1 || ((MobileWebCam.gPictureCounter % mSettings.mFTPBatch) == 0));
+	}
+
+	private boolean performSFTPUpload(String filename, BufferedInputStream buffIn, boolean deletetmpfile) throws Exception
+	{
+		boolean result = false;
+		if (FTPConnection.sftpChannel == null || !FTPConnection.sftpChannel.isConnected())
+		{
+			JSch jsch = new JSch();
+			if (mSettings.mSFTPKeyPath != null && !mSettings.mSFTPKeyPath.trim().isEmpty())
+			{
+				File keyFile = new File(mSettings.mSFTPKeyPath);
+				if (keyFile.exists())
+				{
+					jsch.addIdentity(keyFile.getAbsolutePath());
+				}
+			}
+
+			FTPConnection.sftpSession = jsch.getSession(mSettings.mFTPLogin, mSettings.mFTP, mSettings.mFTPPort);
+			if (mSettings.mFTPPassword != null && !mSettings.mFTPPassword.isEmpty())
+			{
+				FTPConnection.sftpSession.setPassword(mSettings.mFTPPassword);
+			}
+
+			Properties config = new Properties();
+			config.put("StrictHostKeyChecking", "no");
+			FTPConnection.sftpSession.setConfig(config);
+			FTPConnection.sftpSession.connect(15000);
+
+			FTPConnection.sftpChannel = (ChannelSftp) FTPConnection.sftpSession.openChannel("sftp");
+			FTPConnection.sftpChannel.connect(15000);
+		}
+
+		if (mSettings.mFTPDir != null && !mSettings.mFTPDir.trim().isEmpty())
+		{
+			try
+			{
+				FTPConnection.sftpChannel.cd(mSettings.mFTPDir);
+			}
+			catch (SftpException e)
+			{
+				publishProgress("wrong sftp cwd response: " + e.getMessage() + "\nIs the directory correct?");
+				MobileWebCam.LogE("wrong sftp cwd response: " + e.getMessage() + "\nIs the directory correct?");
+				disconnectSFTP();
+				return false;
+			}
+		}
+
+		if (mSettings.mFTPKeepPics > 0)
+		{
+			String replacename = filename.replace(".jpg", "");
+			for (int i = mSettings.mFTPKeepPics - 1; i > 0; i--)
+			{
+				try
+				{
+					FTPConnection.sftpChannel.rename(replacename + i + ".jpg", replacename + (i + 1) + ".jpg");
+				}
+				catch (Exception ignored) {}
+			}
+			try
+			{
+				FTPConnection.sftpChannel.rename(mSettings.mDefaultname, replacename + "1.jpg");
+			}
+			catch (Exception e)
+			{
+				if (e.getMessage() != null)
+					MobileWebCam.LogE(e.getMessage());
+			}
+		}
+
+		do
+		{
+			FTPConnection.sftpChannel.put(buffIn, filename, ChannelSftp.OVERWRITE);
+			buffIn.close();
+			buffIn = null;
+
+			if (deletetmpfile)
+				mContext.deleteFile(filename);
+
+			if (mSettings.mFTPBatch > 1 || mSettings.mReliableUpload)
+			{
+				File file = mContext.getFilesDir();
+				String[] pics = file.list((dir, name) -> name.endsWith(".jpg"));
+				if (pics != null && pics.length > 0)
+				{
+					filename = pics[0];
+					buffIn = new BufferedInputStream(mContext.openFileInput(filename));
+					deletetmpfile = true;
+					MobileWebCam.LogI("sftp batched upload: " + filename);
+				}
+			}
+		}
+		while (buffIn != null);
+
+		if (mSettings.mLogUpload)
+		{
+			String log = MobileWebCam.GetLog(mContext, mContext.getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0), mSettings);
+			InputStream logIS = new ByteArrayInputStream(log.getBytes("UTF-8"));
+			FTPConnection.sftpChannel.put(logIS, "log.txt", ChannelSftp.OVERWRITE);
+		}
+
+		result = true;
+		publishProgress("ok");
+		MobileWebCam.LogI("ok");
+
+		if (!mSettings.mFTPKeepConnected)
+		{
+			disconnectSFTP();
+		}
+
+		return result;
+	}
+
+	private boolean performFTPUpload(String filename, BufferedInputStream buffIn, boolean deletetmpfile) throws Exception
+	{
+		boolean result = false;
+		FTPConnection.client = new FTPClient();
+		FTPConnection.client.connect(InetAddress.getByName(mSettings.mFTP), mSettings.mFTPPort);
+
+		FTPConnection.client.login(mSettings.mFTPLogin, mSettings.mFTPPassword);
+		if (!FTPConnection.client.getReplyString().contains("230"))
+		{
+			publishProgress("wrong ftp login response: " + FTPConnection.client.getReplyString() + "\nAre your credentials correct?");
+			MobileWebCam.LogE("wrong ftp login response: " + FTPConnection.client.getReplyString() + "\nAre your credentials correct?");
+			FTPConnection.client = null;
+			return false;
+		}
+
+		FTPConnection.client.changeWorkingDirectory(mSettings.mFTPDir);
+		if (!FTPConnection.client.getReplyString().contains("250"))
+		{
+			publishProgress("wrong ftp cwd response: " + FTPConnection.client.getReplyString() + "\nIs the directory correct?");
+			MobileWebCam.LogE("wrong ftp cwd response: " + FTPConnection.client.getReplyString() + "\nIs the directory correct?");
+			FTPConnection.client = null;
+			return false;
+		}
+
+		FTPConnection.client.setFileType(org.apache.commons.net.ftp.FTP.BINARY_FILE_TYPE);
+
+		if (mSettings.mFTPPassive)
+			FTPConnection.client.enterLocalPassiveMode();
+		else
+			FTPConnection.client.enterLocalActiveMode();
+
+		if (mSettings.mFTPKeepPics > 0)
+		{
+			String replacename = filename.replace(".jpg", "");
+			for (int i = mSettings.mFTPKeepPics - 1; i > 0; i--)
+			{
+				try
+				{
+					FTPConnection.client.rename(replacename + i + ".jpg", replacename + (i + 1) + ".jpg");
+				}
+				catch (IOException ignored) {}
+			}
+			try
+			{
+				FTPConnection.client.rename(mSettings.mDefaultname, replacename + "1.jpg");
+			}
+			catch (Exception e)
+			{
+				if (e.getMessage() != null)
+					MobileWebCam.LogE(e.getMessage());
+			}
+		}
+
+		do
+		{
+			result = FTPConnection.client.storeFile(filename, buffIn);
+			buffIn.close();
+			buffIn = null;
+
+			if (deletetmpfile)
+				mContext.deleteFile(filename);
+
+			if (mSettings.mFTPBatch > 1 || mSettings.mReliableUpload)
+			{
+				File file = mContext.getFilesDir();
+				String[] pics = file.list((dir, name) -> name.endsWith(".jpg"));
+				if (pics != null && pics.length > 0)
+				{
+					filename = pics[0];
+					buffIn = new BufferedInputStream(mContext.openFileInput(filename));
+					deletetmpfile = true;
+					MobileWebCam.LogI("ftp batched upload: " + filename);
+				}
+			}
+		}
+		while (buffIn != null);
+
+		InputStream logIS = null;
+		if (mSettings.mLogUpload)
+		{
+			String log = MobileWebCam.GetLog(mContext, mContext.getSharedPreferences(MobileWebCam.SHARED_PREFS_NAME, 0), mSettings);
+			logIS = new ByteArrayInputStream(log.getBytes("UTF-8"));
+			if (logIS != null)
+			{
+				result &= FTPConnection.client.storeFile("log.txt", logIS);
+			}
+		}
+
+		if (result)
+		{
+			publishProgress("ok");
+			MobileWebCam.LogI("ok");
+		}
+		else
+		{
+			publishProgress("ftp error: " + FTPConnection.client.getReplyString());
+			MobileWebCam.LogE("ftp error: " + FTPConnection.client.getReplyString());
+		}
+
+		if (!mSettings.mFTPKeepConnected)
+		{
+			FTPConnection.client.logout();
+			FTPConnection.client.disconnect();
+			FTPConnection.client = null;
+		}
+
+		return result;
 	}
 }

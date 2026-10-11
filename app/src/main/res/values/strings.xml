@@ -126,4 +126,17 @@
 	<string name="device_admin_enabled">Device Admin Enabled</string>
 	<string name="device_admin_disabled">Device Admin Disabled</string>
 
+	<string name="ftp_protocol_title">Transfer Protocol</string>
+	<string name="ftp_protocol_summary">Select protocol: FTP (Port 21) or SFTP / SSH (Port 22)</string>
+	<string-array name="entries_list_ftp_protocol">
+		<item>FTP (Plain FTP)</item>
+		<item>SFTP (SSH Secure File Transfer)</item>
+	</string-array>
+	<string-array name="entryvalues_list_ftp_protocol">
+		<item>FTP</item>
+		<item>SFTP</item>
+	</string-array>
+	<string name="sftp_key_title">SSH Private Key File</string>
+	<string name="sftp_key_summary">Optional path to private key for SFTP authentication</string>
+
 </resources>

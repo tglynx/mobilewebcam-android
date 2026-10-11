@@ -54,8 +54,16 @@
 	</PreferenceCategory>
 		
 	<PreferenceCategory
-		android:title="FTP Server Setup">
+		android:title="FTP / SFTP Server Setup">
 	  
+		<ListPreference
+			android:key="ftp_protocol"
+			android:title="@string/ftp_protocol_title"
+			android:summary="@string/ftp_protocol_summary"
+			android:defaultValue="FTP"
+			android:entries="@array/entries_list_ftp_protocol"
+			android:entryValues="@array/entryvalues_list_ftp_protocol"/>
+
 		<EditTextPreference
             android:key="ftpserver_url"
             android:title="Server address"
@@ -101,11 +109,20 @@
             android:inputType="textPassword"
             android:scrollHorizontally="true"
             android:singleLine="true"/>
-	            
+
+		<EditTextPreference
+			android:key="sftp_key_path"
+			android:title="@string/sftp_key_title"
+			android:summary="@string/sftp_key_summary"
+			android:defaultValue=""
+			android:inputType="textUri"
+			android:scrollHorizontally="true"
+			android:singleLine="true"/>
+
 		<CheckBoxPreference
 			android:key="cam_passiveftp"
 			android:title="Passive Mode"
-			android:summary="Use passive ftp mode."
+			android:summary="Use passive ftp mode (FTP only)."
 			android:defaultValue="true"/>
 	
 	</PreferenceCategory>

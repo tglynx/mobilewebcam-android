@@ -18,67 +18,92 @@ package de.baarflieger.mobilewebcam;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.Bundle;
+import android.preference.Preference;
 import android.preference.PreferenceActivity;
 
 import java.io.IOException;
 
 public class FTPSettings extends PreferenceActivity implements OnSharedPreferenceChangeListener
 {
-	 @Override
-	 public void onCreate(Bundle savedInstanceState)
-	 {
-        // turn off the window's title bar
-//***        requestWindowFeature(Window.FEATURE_NO_TITLE);
+	@Override
+	public void onCreate(Bundle savedInstanceState)
+	{
+		super.onCreate(savedInstanceState);
 
-//***        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-        super.onCreate(savedInstanceState);
-		 		 
-        getPreferenceManager().setSharedPreferencesName(MobileWebCam.SHARED_PREFS_NAME);
+		getPreferenceManager().setSharedPreferencesName(MobileWebCam.SHARED_PREFS_NAME);
 		this.addPreferencesFromResource(R.layout.ftpserversettings);
-        getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
-	 }
+		getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+		updateUIForProtocol();
+	}
 
-     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key)
-     {
- 		// need to listen for ftp settings changes and reconnect later
-    	if(key == "ftp_keep_open")
-    	{
-	 		if(UploadFTPPhoto.FTPConnection.client != null)
-	 		{
-	 			try
-	 			{
-	 				UploadFTPPhoto.FTPConnection.client.abort();
-	 				UploadFTPPhoto.FTPConnection.client.disconnect();
-	 			}
-	 			catch (IOException e)
-	 			{
-	 				e.printStackTrace();
-	 			}
-	 			UploadFTPPhoto.FTPConnection.client = null;
-	 		}
-    	}
-     }
-     
-    @Override
-    protected void onDestroy()
-    {
-        getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
-        super.onDestroy();
-    }
-    
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key)
+	{
+		if ("ftp_protocol".equals(key))
+		{
+			String protocol = sharedPreferences.getString("ftp_protocol", "FTP");
+			String currentPort = sharedPreferences.getString("ftp_port", "21");
+			if ("SFTP".equals(protocol) && "21".equals(currentPort))
+			{
+				sharedPreferences.edit().putString("ftp_port", "22").apply();
+			}
+			else if ("FTP".equals(protocol) && "22".equals(currentPort))
+			{
+				sharedPreferences.edit().putString("ftp_port", "21").apply();
+			}
+			updateUIForProtocol();
+		}
+
+		if ("ftp_keep_open".equals(key) || "ftp_protocol".equals(key) || "ftpserver_url".equals(key))
+		{
+			if (UploadFTPPhoto.FTPConnection.client != null)
+			{
+				try
+				{
+					UploadFTPPhoto.FTPConnection.client.abort();
+					UploadFTPPhoto.FTPConnection.client.disconnect();
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+				UploadFTPPhoto.FTPConnection.client = null;
+			}
+			UploadFTPPhoto.FTPConnection.sftpSession = null;
+			UploadFTPPhoto.FTPConnection.sftpChannel = null;
+		}
+	}
+
+	private void updateUIForProtocol()
+	{
+		SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
+		String protocol = prefs.getString("ftp_protocol", "FTP");
+		Preference passivePref = findPreference("cam_passiveftp");
+		if (passivePref != null)
+		{
+			passivePref.setEnabled("FTP".equals(protocol));
+		}
+	}
+
+	@Override
+	protected void onDestroy()
+	{
+		getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
+		super.onDestroy();
+	}
+
 	@Override
 	protected void onResume()
 	{
 		super.onResume();
 
 		MobileWebCam.gInSettings = true;
-	}    
-    
-    public void onPause()
-    {
-    	super.onPause();
-    	
+		updateUIForProtocol();
+	}
+
+	public void onPause()
+	{
+		super.onPause();
+
 		MobileWebCam.gInSettings = false;
-    }    
-};
+	}
+}

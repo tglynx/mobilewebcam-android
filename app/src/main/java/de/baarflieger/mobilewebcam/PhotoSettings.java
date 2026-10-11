@@ -163,6 +163,10 @@ public class PhotoSettings implements SharedPreferences.OnSharedPreferenceChange
 	public boolean mFTPTimestamp = false;
     @EditIntPref(key = "ftp_keepoldpics", val = 0)
 	public int mFTPKeepPics = 0;
+	@StringPref(key = "ftp_protocol", val = "FTP")
+	public String mFTPProtocol = "FTP";
+	@StringPref(key = "sftp_key_path", val = "")
+	public String mSFTPKeyPath = "";
 	@StringPref(key = "ftpserver_url", val = mDefaultFTPurl)
 	public String mFTP = mDefaultFTPurl;
 	@EditIntPref(key = "ftp_port", val = 21)
