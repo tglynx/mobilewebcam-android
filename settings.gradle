@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "mobilewebcam"
 include ':app'
+include ':openCVLibrary'

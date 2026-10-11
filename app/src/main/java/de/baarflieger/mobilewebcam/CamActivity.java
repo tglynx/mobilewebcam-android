@@ -26,6 +26,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -43,6 +44,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
+
+import org.opencv.android.OpenCVLoader;
 
 public class CamActivity extends AppCompatActivity
 {
@@ -69,7 +72,14 @@ public class CamActivity extends AppCompatActivity
 	protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
-        
+
+		// Initialize OpenCV
+		if (!OpenCVLoader.initDebug()) {
+			Log.e("OpenCV", "Initialization failed");
+		} else {
+			Log.d("OpenCV", "Initialization successful");
+		}
+
         // Hide the window title.
 //***        requestWindowFeature(Window.FEATURE_NO_TITLE);
 
