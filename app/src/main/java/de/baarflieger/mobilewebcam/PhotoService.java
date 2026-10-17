@@ -21,6 +21,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
@@ -70,11 +71,12 @@ public class PhotoService {
 
 	//NEW TAKEPICTURE VARIABLES
 	private String mPhotoEvent;
+	private HandlerThread mHandlerThread;
 	private Handler mBackgroundHandler;
 	private CameraDevice mCameraDevice;
 	private CameraCaptureSession mCaptureSession;
 	private ImageReader mImageReader;
-	private ImageReader mImageReaderPreview;
+	private SurfaceTexture mDummySurfaceTexture;
 
 	public PhotoService(Context c, ITextUpdater tu) {
 		mContext = c;
@@ -331,6 +333,11 @@ public class PhotoService {
 		Preview.mPhotoLockTime = System.currentTimeMillis();
 
 		mPhotoEvent = event;
+
+		mHandlerThread = new HandlerThread("CameraBackgroundThread");
+		mHandlerThread.start();
+		mBackgroundHandler = new Handler(mHandlerThread.getLooper());
+
 		initializeCamera();
 	}
 
@@ -343,18 +350,19 @@ public class PhotoService {
 				mCameraManager.openCamera(cameraId, stateCallback, mBackgroundHandler);
 			} else {
 				mTextUpdater.Toast("Suitable camera not found", Toast.LENGTH_SHORT);
+				closeCamera();
 				throw new CameraAccessException(CameraAccessException.CAMERA_ERROR, "Suitable camera not found");
 			}
 		} catch (CameraAccessException e) {
-			Preview.mPhotoLock.set(false);
 			mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 			Log.e("MobileWebCam", "Cannot access the camera.", e);
+			closeCamera();
 		}
 	}
 
 	private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
 		@Override
-		public void onOpened(CameraDevice cameraDevice) {
+		public void onOpened(@NonNull CameraDevice cameraDevice) {
 			mCameraDevice = cameraDevice;
 
 			try {
@@ -379,172 +387,166 @@ public class PhotoService {
 				createCameraPreviewSession(selectedSize);
 			} catch (CameraAccessException e) {
 				e.printStackTrace();
-				Preview.mPhotoLock.set(false);
 				mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
+				closeCamera();
 			}
 		}
 
 		@Override
-		public void onDisconnected(CameraDevice cameraDevice) {
-
-			cameraDevice.close();
-			Preview.mPhotoLock.set(false);
-
+		public void onDisconnected(@NonNull CameraDevice cameraDevice) {
+			closeCamera();
 		}
 
 		@Override
-		public void onError(CameraDevice cameraDevice, int error) {
-			cameraDevice.close();
-			mCameraDevice = null;
-			Preview.mPhotoLock.set(false);
+		public void onError(@NonNull CameraDevice cameraDevice, int error) {
+			closeCamera();
 		}
 	};
 
 	private void createCameraPreviewSession(android.util.Size selectedSize) {
 		try {
+			mImageReader = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 2);
 
-			mImageReaderPreview = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1);
-			mImageReader = ImageReader.newInstance(selectedSize.getWidth(), selectedSize.getHeight(), ImageFormat.JPEG, 1);
-
-			// Set the listener to handle new images.
-
-			mImageReaderPreview.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
-				@Override
-				public void onImageAvailable(ImageReader reader) {
-					try (Image image = reader.acquireNextImage()) {
+			mImageReader.setOnImageAvailableListener(reader -> {
+				try (Image image = reader.acquireLatestImage()) {
+					if (image != null) {
 						ByteBuffer buffer = image.getPlanes()[0].getBuffer();
 						byte[] bytes = new byte[buffer.remaining()];
 						buffer.get(bytes);
 
-						Log.i("MobileWebCam", "Image preview updated");
-
-					}
-				}
-			}, mBackgroundHandler);
-
-			mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
-				@Override
-				public void onImageAvailable(ImageReader reader) {
-					try (Image image = reader.acquireLatestImage()) {
-
-						ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-						byte[] bytes = new byte[buffer.remaining()];
-						buffer.get(bytes);
-
-						// Process the image data as needed
 						MobileWebCam.gLastMotionKeepAliveTime = System.currentTimeMillis();
 						processImage(bytes, image.getWidth(), image.getHeight());
 					}
+				} catch (Exception e) {
+					Log.e("MobileWebCam", "Error reading captured image", e);
 				}
 			}, mBackgroundHandler);
 
-			Surface surface = mImageReader.getSurface();
-			Surface previewSurface = mImageReaderPreview.getSurface();
+			// Offscreen SurfaceTexture triggers 3A (AE/AWB) hardware algorithms in Camera2
+			mDummySurfaceTexture = new SurfaceTexture(101);
+			mDummySurfaceTexture.setDefaultBufferSize(selectedSize.getWidth(), selectedSize.getHeight());
+			Surface previewSurface = new Surface(mDummySurfaceTexture);
+			Surface stillSurface = mImageReader.getSurface();
 
-			List<Surface> surfaces = new ArrayList<>();
-			surfaces.add(surface);
-			surfaces.add(previewSurface);
+			List<Surface> surfaces = Arrays.asList(previewSurface, stillSurface);
 
 			final CaptureRequest.Builder previewBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-			previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
 			previewBuilder.addTarget(previewSurface);
-
-			final CaptureRequest.Builder builder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-			builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-			builder.addTarget(surface);
-
 			previewBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
 			previewBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+			previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 			previewBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
 
-			builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-			builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
-			builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
-
-			/*CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
-
-			// Check if the camera supports auto-exposure compensation
-			Range<Integer> aeCompensationRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
-			if (aeCompensationRange != null) {
-				int compensationValue = 0; // Define this based on your needs
-				if (aeCompensationRange.contains(compensationValue)) {
-					builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, compensationValue);
-				}
-			}*/
+			final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+			captureBuilder.addTarget(stillSurface);
+			captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+			captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+			captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+			captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
 
 			mCameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
 				@Override
-				public void onConfigured(CameraCaptureSession session) {
-
-					previewBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,getRange());
-					builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,getRange());
-
+				public void onConfigured(@NonNull CameraCaptureSession session) {
 					mCaptureSession = session;
-
 					try {
-						mCaptureSession.setRepeatingRequest(previewBuilder.build(), null, backgroundHandler);
+						// Start repeating preview request on mDummySurfaceTexture so AE/AWB run continuously
+						mCaptureSession.setRepeatingRequest(previewBuilder.build(), null, mBackgroundHandler);
 
-						Handler delayHandler = new Handler();
-						delayHandler.postDelayed(() -> capturePhoto(builder), mSettings.mDelayAfterCameraOpened);
+						// Wait for AE/AWB to converge (at least 800ms) before capturing photo
+						int delay = Math.max(mSettings.mDelayAfterCameraOpened, 800);
+						mBackgroundHandler.postDelayed(() -> capturePhoto(captureBuilder), delay);
 
 					} catch (CameraAccessException e) {
-						throw new RuntimeException(e);
+						Log.e("MobileWebCam", "Failed to start camera preview", e);
+						closeCamera();
 					}
-
 				}
 
 				@Override
-				public void onConfigureFailed(CameraCaptureSession session) {
-					Preview.mPhotoLock.set(false);
-					Log.e("MobileWebCam", "Failed to configure camera.");
+				public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+					Log.e("MobileWebCam", "Failed to configure camera session.");
+					closeCamera();
 				}
 			}, mBackgroundHandler);
 
 		} catch (CameraAccessException e) {
-			Preview.mPhotoLock.set(false);
 			Log.e("MobileWebCam", "Failed to create capture session.", e);
+			closeCamera();
 		}
 	}
 
-	private Range<Integer> getRange() {
-		CameraCharacteristics chars = null;
+	private void capturePhoto(CaptureRequest.Builder captureBuilder) {
 		try {
-			chars = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
-			Range<Integer>[] ranges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-			Range<Integer> result = null;
-			for (Range<Integer> range : ranges) {
-				int upper = range.getUpper();
-				// 10 - min range upper for my needs
-				if (upper >= 10) {
-					if (result == null || upper < result.getUpper().intValue()) {
-						result = range;
-					}
-				}
+			if (mCaptureSession == null) {
+				closeCamera();
+				return;
 			}
-			if (result == null) {
-				result = ranges[0];
-			}
-			return result;
-		} catch (CameraAccessException e) {
-			e.printStackTrace();
-			return null;
-		}
-	}
-	private void capturePhoto(CaptureRequest.Builder builder) {
-		try {
 			mCaptureSession.stopRepeating();
-			mCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
+			mCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
 				@Override
-				public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+				public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
 					super.onCaptureCompleted(session, request, result);
 					Log.i("MobileWebCam", "Image captured for event: " + mPhotoEvent);
+					closeCamera();
+				}
+
+				@Override
+				public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+					super.onCaptureFailed(session, request, failure);
+					Log.e("MobileWebCam", "Capture failed: " + failure.getReason());
+					closeCamera();
 				}
 			}, mBackgroundHandler);
 
 		} catch (CameraAccessException e) {
 			mTextUpdater.Toast(e.getMessage(), Toast.LENGTH_SHORT);
 			Log.e("MobileWebCam", "Failed to capture photo.", e);
+			closeCamera();
 		}
+	}
+
+	private void closeCamera() {
+		if (mCaptureSession != null) {
+			try {
+				mCaptureSession.close();
+			} catch (Exception ignored) {}
+			mCaptureSession = null;
+		}
+		if (mCameraDevice != null) {
+			try {
+				mCameraDevice.close();
+			} catch (Exception ignored) {}
+			mCameraDevice = null;
+		}
+		if (mImageReader != null) {
+			try {
+				mImageReader.close();
+			} catch (Exception ignored) {}
+			mImageReader = null;
+		}
+		if (mDummySurfaceTexture != null) {
+			try {
+				mDummySurfaceTexture.release();
+			} catch (Exception ignored) {}
+			mDummySurfaceTexture = null;
+		}
+		if (mHandlerThread != null) {
+			final HandlerThread threadToQuit = mHandlerThread;
+			mHandlerThread = null;
+			if (mBackgroundHandler != null) {
+				mBackgroundHandler.postDelayed(() -> {
+					try {
+						threadToQuit.quitSafely();
+					} catch (Exception ignored) {}
+				}, 1000);
+				mBackgroundHandler = null;
+			} else {
+				try {
+					threadToQuit.quitSafely();
+				} catch (Exception ignored) {}
+			}
+		}
+		Preview.mPhotoLock.set(false);
 	}
 
 	private void processImage(byte[] imageData, int width, int height) {
