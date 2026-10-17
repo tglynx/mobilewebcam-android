@@ -58,16 +58,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.Collections;
 
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfByte;
-import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfInt;
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.android.Utils;
-
 @SuppressLint("Instantiatable")
 public class PhotoService {
 	private Handler mHandler = new Handler();
@@ -561,24 +551,8 @@ public class PhotoService {
 		Date date = new Date(); // Capture the current time.
 		Log.i("MobileWebCam", "Image captured");
 
-		// Decode the image
-		Mat originalMat = Imgcodecs.imdecode(new MatOfByte(imageData), Imgcodecs.IMREAD_COLOR);
-		if (originalMat.empty()) {
-			Log.e("OpenCV", "Failed to decode image");
-			return;
-		}
-
-		// Apply automatic brightness and contrast optimization
-		Mat optimizedMat = automaticBrightnessAndContrast(originalMat, 1);
-
-		// Convert back to byte array
-		MatOfByte mob = new MatOfByte();
-		Imgcodecs.imencode(".jpg", optimizedMat, mob);
-		byte[] adjustedImageData = mob.toArray();
-
-		// Using the adjusted image data
 		Size imageSize = new Size(width, height); // Using the custom Size class to stay somewhat compatible with the legacy camera.size
-		WorkImage work = new WorkImage(mContext, mTextUpdater, adjustedImageData, imageSize, date, mPhotoEvent);
+		WorkImage work = new WorkImage(mContext, mTextUpdater, imageData, imageSize, date, mPhotoEvent);
 		MobileWebCam.gPictureCounter++;
 
 		// Start the work on a new thread.
@@ -586,50 +560,6 @@ public class PhotoService {
 
 		Preview.mPhotoLock.set(false);
 		Log.i("MobileWebCam", "Work submitted " + MobileWebCam.gPictureCounter);
-	}
-
-	private Mat automaticBrightnessAndContrast(Mat image, double clipHistPercent) {
-		Mat gray = new Mat();
-		Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
-
-		// Calculate grayscale histogram
-		Mat hist = new Mat();
-		Imgproc.calcHist(Arrays.asList(gray), new MatOfInt(0), new Mat(), hist, new MatOfInt(256), new MatOfFloat(0, 256));
-		int histSize = (int) hist.total();
-
-		// Calculate cumulative distribution from the histogram
-		float[] accumulator = new float[histSize];
-		accumulator[0] = (float) hist.get(0, 0)[0];
-		for (int i = 1; i < histSize; i++) {
-			accumulator[i] = accumulator[i - 1] + (float) hist.get(i, 0)[0];
-		}
-
-		// Locate points to clip
-		float maximum = accumulator[histSize - 1];
-		clipHistPercent *= (maximum / 100.0);
-		clipHistPercent /= 2.0;
-
-		// Locate left cut
-		int minimumGray = 0;
-		while (accumulator[minimumGray] < clipHistPercent) {
-			minimumGray++;
-		}
-
-		// Locate right cut
-		int maximumGray = histSize - 1;
-		while (accumulator[maximumGray] >= (maximum - clipHistPercent)) {
-			maximumGray--;
-		}
-
-		// Calculate alpha and beta values
-		float alpha = 255.0f / (maximumGray - minimumGray);
-		float beta = -minimumGray * alpha;
-
-		// Apply the brightness and contrast adjustment
-		Mat result = new Mat();
-		image.convertTo(result, -1, alpha, beta);
-
-		return result;
 	}
 
 	private String getCameraId(CameraManager manager, boolean useFrontCamera) throws CameraAccessException {

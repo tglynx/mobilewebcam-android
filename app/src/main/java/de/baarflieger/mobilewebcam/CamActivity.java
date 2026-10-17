@@ -45,8 +45,6 @@ import java.util.List;
 
 import de.baarflieger.mobilewebcam.PhotoSettings.Mode;
 
-import org.opencv.android.OpenCVLoader;
-
 public class CamActivity extends AppCompatActivity
 {
 	private static final int REQUEST_PERMISSIONS_CODE = 101; // You can use any integer here
@@ -72,13 +70,6 @@ public class CamActivity extends AppCompatActivity
 	protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
-
-		// Initialize OpenCV
-		if (!OpenCVLoader.initDebug()) {
-			Log.e("OpenCV", "Initialization failed");
-		} else {
-			Log.d("OpenCV", "Initialization successful");
-		}
 
         // Hide the window title.
 //***        requestWindowFeature(Window.FEATURE_NO_TITLE);
