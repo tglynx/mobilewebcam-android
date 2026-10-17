@@ -1,15 +1,27 @@
 *.iml
 .gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+local.properties
 .DS_Store
+
+# Build Output
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+
+# Java Crash Logs
+hs_err_pid*.log
+replay_pid*.log
+
+# IDE / Android Studio (User- & machine-specific settings)
+/.idea/workspace.xml
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/shelf
+/.idea/deploymentTargetSelector.xml
+/.idea/appInsightsSettings.xml
+/.idea/studiobot.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
